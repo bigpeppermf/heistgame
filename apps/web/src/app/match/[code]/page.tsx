@@ -13,7 +13,8 @@ import { PowerupOffer } from '@/components/polished/PowerupOffer';
 import { PowerupTray } from '@/components/polished/PowerupTray';
 import { ScorePanel } from '@/components/polished/ScorePanel';
 import { formatClock, remainingMs } from '@/lib/clock';
-import { ask } from '@/lib/socket';
+import { bufferKey, loadBuffer, saveBuffer } from '@/lib/editorBuffer';
+import { ask, loadSession } from '@/lib/socket';
 import { useMatch } from '@/lib/useMatch';
 
 const HOSTILE: PowerupType[] = ['EMP', 'BLACKOUT', 'JAMMED_COMMS', 'ROADBLOCK'];
@@ -24,7 +25,7 @@ export default function MatchPage({ params }: { params: Promise<{ code: string }
   const { code: roomCode } = use(params);
   const {
     snapshot, me, opponent, now, roundResult, runOutput, offer, setOffer,
-    gameOver, toast, notify, progress,
+    gameOver, toast, notify, progress, connectionError,
   } = useMatch(roomCode);
 
   const [language, setLanguage] = useState<Language>('python');
@@ -36,35 +37,43 @@ export default function MatchPage({ params }: { params: Promise<{ code: string }
   const problem = snapshot?.problem ?? null;
   const phase = snapshot?.phase;
   const round = snapshot?.round ?? 0;
+  const playerId = loadSession()?.playerId;
+  const activeKey = problem && playerId ? bufferKey(roomCode, playerId, problem.id, language) : null;
 
   // Seed the editor from starter code once per problem+language; revisiting a
   // key restores the player's own buffer instead of the starter.
   useEffect(() => {
     if (!problem) return;
-    const key = `${problem.id}:${language}`;
-    if (seeded === key) return;
-    setCode(buffers.current[key] ?? problem.starterCode[language]);
-    setSeeded(key);
-  }, [problem, language, seeded]);
+    if (!activeKey || seeded === activeKey) return;
+    setCode(buffers.current[activeKey] ?? loadBuffer(activeKey) ?? problem.starterCode[language]);
+    setSeeded(activeKey);
+  }, [activeKey, problem, language, seeded]);
 
   const onCodeChange = (next: string) => {
-    if (seeded) buffers.current[seeded] = next;
+    if (!activeKey || seeded !== activeKey || next === code) return;
+    buffers.current[activeKey] = next;
+    saveBuffer(activeKey, next);
     setCode(next);
+    if (phase !== 'CODING') return;
+    latest.current = { code: next, language };
+    if (!syncTimer.current) {
+      syncTimer.current = setTimeout(() => {
+        syncTimer.current = null;
+        void ask('code_sync', latest.current);
+      }, BALANCE.CODE_SYNC_DEBOUNCE_MS);
+    }
   };
 
   // code_sync, throttled: the first change arms a timer and the timer sends the
   // latest buffer. Continuous typing therefore still syncs every interval, so the
   // server always holds a recent buffer to auto-submit at the coding deadline.
   const latest = useRef({ code, language });
-  latest.current = { code, language };
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (phase !== 'CODING' || syncTimer.current) return;
-    syncTimer.current = setTimeout(() => {
-      syncTimer.current = null;
-      void ask('code_sync', latest.current);
-    }, BALANCE.CODE_SYNC_DEBOUNCE_MS);
-  }, [code, language, phase]);
+    if (phase === 'CODING' || !syncTimer.current) return;
+    clearTimeout(syncTimer.current);
+    syncTimer.current = null;
+  }, [phase]);
   useEffect(() => () => {
     if (syncTimer.current) clearTimeout(syncTimer.current);
     syncTimer.current = null;
@@ -109,7 +118,14 @@ export default function MatchPage({ params }: { params: Promise<{ code: string }
   }
 
   if (!snapshot) {
-    return <main className="grid min-h-screen place-items-center">Connecting…</main>;
+    return (
+      <main className="grid min-h-screen place-items-center text-center">
+        <div>
+          <p>Connecting…</p>
+          {connectionError && <p className="mt-3" style={{ color: 'var(--hc-robber)' }}>{connectionError}</p>}
+        </div>
+      </main>
+    );
   }
 
   if (phase === 'LOBBY') {
@@ -127,7 +143,7 @@ export default function MatchPage({ params }: { params: Promise<{ code: string }
   }
 
   const oppProgress = opponent ? progress[opponent.id] : undefined;
-  const showScores = !!roundResult && (phase === 'SCORING' || phase === 'POWERUP' || phase === 'MOVEMENT');
+  const showScores = !!roundResult && phase === 'SCORING';
 
   return (
     <main className="relative flex h-screen flex-col">
