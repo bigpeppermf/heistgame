@@ -30,16 +30,20 @@ export type ExecOutcome = {
 let active = 0;
 const waiting: (() => void)[] = [];
 
-async function withSlot<T>(fn: () => Promise<T>): Promise<T> {
+export async function withSlot<T>(fn: () => Promise<T>): Promise<T> {
   if (active >= BALANCE.EXEC_MAX_CONCURRENT) {
+    // The releasing task hands its slot straight to us; `active` is not
+    // touched, so no newcomer can sneak in between release and wake-up.
     await new Promise<void>((resolve) => waiting.push(resolve));
+  } else {
+    active += 1;
   }
-  active += 1;
   try {
     return await fn();
   } finally {
-    active -= 1;
-    waiting.shift()?.();
+    const next = waiting.shift();
+    if (next) next(); // FIFO hand-off, slot stays counted in `active`
+    else active -= 1;
   }
 }
 

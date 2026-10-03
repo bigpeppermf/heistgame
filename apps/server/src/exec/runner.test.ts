@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
-import { execute } from './runner.js';
-import type { TestCase } from '@heist/shared';
+import { execute, withSlot } from './runner.js';
+import { BALANCE, type TestCase } from '@heist/shared';
 
 const TESTS: TestCase[] = [
   { input: [[2, 7, 11, 15], 9], expected: [0, 1] },
@@ -278,4 +278,43 @@ def crack_vault(codes, target):
     const { status } = spawnSync('pgrep', ['-f', 'sleep 32']);
     expect(status).toBe(1); // no surviving match
   }, 10_000);
+});
+
+describe('withSlot — concurrency limit', () => {
+  it('never exceeds EXEC_MAX_CONCURRENT, even for calls arriving as slots release', async () => {
+    const limit = BALANCE.EXEC_MAX_CONCURRENT;
+    let live = 0;
+    let max = 0;
+    const started: number[] = [];
+    const pending: Promise<void>[] = [];
+    let extras = 0;
+
+    const task = (n: number): Promise<void> => withSlot(() => {
+      live += 1;
+      max = Math.max(max, live);
+      started.push(n);
+      // A thenable (not a native promise) delays withSlot's wake-up by a tick,
+      // letting a fresh call land in the window between release and hand-off.
+      return {
+        then(resolve: () => void) {
+          setTimeout(() => {
+            live -= 1;
+            resolve();
+            if (extras < limit) {
+              extras += 1;
+              queueMicrotask(() => { pending.push(task(1000 + extras)); });
+            }
+          }, 15);
+        },
+      } as unknown as Promise<void>;
+    });
+
+    const total = limit * 3;
+    for (let n = 0; n < total; n += 1) pending.push(task(n));
+    while (live > 0 || started.length < total + limit) await new Promise((r) => setTimeout(r, 20));
+    await Promise.all(pending);
+
+    expect(max).toBe(limit);
+    expect(started.slice(0, total)).toEqual([...Array(total).keys()]); // FIFO
+  });
 });
