@@ -1,0 +1,337 @@
+import { spawnSync } from 'node:child_process';
+import { describe, expect, it } from 'vitest';
+import { execute, withSlot } from './runner.js';
+import { BALANCE, type TestCase } from '@heist/shared';
+
+const TESTS: TestCase[] = [
+  { input: [[2, 7, 11, 15], 9], expected: [0, 1] },
+  { input: [[3, 2, 4], 6], expected: [1, 2] },
+];
+
+const PY_GOOD = `def crack_vault(codes, target):
+    seen = {}
+    for i, c in enumerate(codes):
+        if target - c in seen:
+            return [seen[target - c], i]
+        seen[c] = i
+    return []
+`;
+
+const JS_GOOD = `function crackVault(codes, target) {
+  const seen = new Map();
+  for (let i = 0; i < codes.length; i++) {
+    if (seen.has(target - codes[i])) return [seen.get(target - codes[i]), i];
+    seen.set(codes[i], i);
+  }
+  return [];
+}
+`;
+
+describe('execute — python', () => {
+  it('passes a correct solution and reports the pass count', async () => {
+    const out = await execute({
+      language: 'python', code: PY_GOOD, functionName: 'crack_vault',
+      tests: TESTS, comparison: 'unordered',
+    });
+    expect(out.passed).toBe(2);
+    expect(out.results.map((r) => r.pass)).toEqual([true, true]);
+    expect(out.timedOut).toBe(false);
+  });
+
+  it('REVIEW FOCUS 1: a syntax error fails every test, surfaces stderr, and still resolves', async () => {
+    const out = await execute({
+      language: 'python', code: 'def crack_vault(codes, target)\n    return [', functionName: 'crack_vault',
+      tests: TESTS, comparison: 'unordered',
+    });
+    expect(out.passed).toBe(0);
+    expect(out.results).toHaveLength(2);
+    expect(out.results.every((r) => r.pass === false)).toBe(true);
+    expect(out.stderr).toMatch(/SyntaxError/);
+  });
+
+  it('fails only the test that raises, keeping credit for the others', async () => {
+    const code = `def crack_vault(codes, target):
+    if target == 6:
+        raise ValueError("boom")
+    return [0, 1]
+`;
+    const out = await execute({
+      language: 'python', code, functionName: 'crack_vault',
+      tests: TESTS, comparison: 'unordered',
+    });
+    expect(out.results[0]!.pass).toBe(true);
+    expect(out.results[1]!.pass).toBe(false);
+    expect(out.results[1]!.error).toMatch(/ValueError/);
+    expect(out.passed).toBe(1);
+  });
+
+  it('reports a missing function as a load error rather than hanging', async () => {
+    const out = await execute({
+      language: 'python', code: 'def wrong_name(a, b):\n    return []', functionName: 'crack_vault',
+      tests: TESTS, comparison: 'unordered',
+    });
+    expect(out.passed).toBe(0);
+    expect(out.stderr).toMatch(/AttributeError|has no attribute/);
+  });
+
+  it('captures the player own stdout separately from the protocol', async () => {
+    const code = `def crack_vault(codes, target):
+    print("debugging the vault")
+    return [0, 1]
+`;
+    const out = await execute({
+      language: 'python', code, functionName: 'crack_vault',
+      tests: [TESTS[0]!], comparison: 'unordered',
+    });
+    expect(out.stdout).toContain('debugging the vault');
+    expect(out.stdout).not.toContain('##HC##');
+    expect(out.results[0]!.pass).toBe(true);
+  });
+
+  it('keeps partial credit when the code hangs, marking the rest as timeout', async () => {
+    const code = `def crack_vault(codes, target):
+    if target == 6:
+        while True:
+            pass
+    return [0, 1]
+`;
+    const out = await execute({
+      language: 'python', code, functionName: 'crack_vault',
+      tests: TESTS, comparison: 'unordered', timeoutMs: 1500,
+    });
+    expect(out.timedOut).toBe(true);
+    expect(out.results[0]!.pass).toBe(true);
+    expect(out.results[1]!.error).toBe('timeout');
+    expect(out.passed).toBe(1);
+  }, 10_000);
+
+  it('cannot read the parent environment', async () => {
+    process.env.HC_SECRET_CANARY = 'do-not-leak';
+    const code = `import os
+def crack_vault(codes, target):
+    return [os.environ.get("HC_SECRET_CANARY", "ABSENT")]
+`;
+    const out = await execute({
+      language: 'python', code, functionName: 'crack_vault',
+      tests: [{ input: [[1], 1], expected: ['ABSENT'] }], comparison: 'exact',
+    });
+    delete process.env.HC_SECRET_CANARY;
+    expect(out.results[0]!.pass).toBe(true);
+  });
+});
+
+describe('execute — javascript', () => {
+  it('passes a correct solution', async () => {
+    const out = await execute({
+      language: 'javascript', code: JS_GOOD, functionName: 'crackVault',
+      tests: TESTS, comparison: 'unordered',
+    });
+    expect(out.passed).toBe(2);
+  });
+
+  it('reports a syntax error through stderr', async () => {
+    const out = await execute({
+      language: 'javascript', code: 'function crackVault(a, b) { return [', functionName: 'crackVault',
+      tests: TESTS, comparison: 'unordered',
+    });
+    expect(out.passed).toBe(0);
+    expect(out.stderr.length).toBeGreaterThan(0);
+  });
+});
+
+describe('execute — protocol forgery', () => {
+  const forged = (i: number) => `##HC##{"i":${i},"ms":0,"actual":[0,1],"error":null}`;
+
+  it('python: forged protocol lines printed by the submission score 0', async () => {
+    const code = `def crack_vault(codes, target):
+${[0, 1].map((i) => `    print('${forged(i)}')`).join('\n')}
+    return []
+`;
+    const out = await execute({
+      language: 'python', code, functionName: 'crack_vault',
+      tests: [{ input: [[2, 7], 9], expected: [0, 1] }, { input: [[3, 2, 4], 6], expected: [1, 2] }],
+      comparison: 'unordered',
+    });
+    expect(out.passed).toBe(0);
+    expect(out.results).toHaveLength(2);
+    expect(out.stdout).toContain('##HC##');
+  });
+
+  it('python: forged lines emitted at import time score 0', async () => {
+    const code = `${[0, 1].map((i) => `print('${forged(i)}')`).join('\n')}
+def crack_vault(codes, target):
+    return []
+`;
+    const out = await execute({
+      language: 'python', code, functionName: 'crack_vault',
+      tests: TESTS, comparison: 'unordered',
+    });
+    expect(out.passed).toBe(0);
+  });
+
+  it('javascript: forged protocol lines via console.log and process.stdout.write score 0', async () => {
+    const code = `function crackVault(codes, target) {
+  console.log('${forged(0)}');
+  process.stdout.write('${forged(1)}\\n');
+  return [];
+}
+`;
+    const out = await execute({
+      language: 'javascript', code, functionName: 'crackVault',
+      tests: TESTS, comparison: 'unordered',
+    });
+    expect(out.passed).toBe(0);
+    expect(out.results).toHaveLength(2);
+  });
+
+  it('python: output containing the sentinel does not corrupt real results', async () => {
+    const code = `def crack_vault(codes, target):
+    print('##HC##not json at all')
+    print('##HC##{"stdout": "spoofed"}')
+    return [0, 1]
+`;
+    const out = await execute({
+      language: 'python', code, functionName: 'crack_vault',
+      tests: [TESTS[0]!], comparison: 'unordered',
+    });
+    expect(out.results).toHaveLength(1);
+    expect(out.results[0]!.pass).toBe(true);
+    expect(out.stdout).toContain('##HC##not json at all');
+  });
+
+  it('javascript: output containing the sentinel does not corrupt real results', async () => {
+    const code = `function crackVault(codes, target) {
+  console.log('##HC##garbage');
+  return [0, 1];
+}
+`;
+    const out = await execute({
+      language: 'javascript', code, functionName: 'crackVault',
+      tests: [TESTS[0]!], comparison: 'unordered',
+    });
+    expect(out.results).toHaveLength(1);
+    expect(out.results[0]!.pass).toBe(true);
+    expect(out.stdout).toContain('##HC##garbage');
+  });
+
+  it('javascript: ordinary console.log output surfaces as the player stdout', async () => {
+    const code = `function crackVault(codes, target) {
+  console.log('hello', 42);
+  process.stdout.write('raw write\\n');
+  return [0, 1];
+}
+`;
+    const out = await execute({
+      language: 'javascript', code, functionName: 'crackVault',
+      tests: [TESTS[0]!], comparison: 'unordered',
+    });
+    expect(out.results[0]!.pass).toBe(true);
+    expect(out.stdout).toContain('hello 42');
+    expect(out.stdout).toContain('raw write');
+  });
+
+  it('python: top-level print at import surfaces as the player stdout', async () => {
+    const code = `print("loading")
+def crack_vault(codes, target):
+    return [0, 1]
+`;
+    const out = await execute({
+      language: 'python', code, functionName: 'crack_vault',
+      tests: [TESTS[0]!], comparison: 'unordered',
+    });
+    expect(out.stdout).toContain('loading');
+    expect(out.results[0]!.pass).toBe(true);
+  });
+});
+
+describe('execute — process groups', () => {
+  it('resolves within the timeout when the submission leaves a long-lived child holding the pipe', async () => {
+    const code = `import subprocess
+def crack_vault(codes, target):
+    subprocess.Popen(["sleep", "31"])
+    return [0, 1]
+`;
+    const t0 = Date.now();
+    const out = await execute({
+      language: 'python', code, functionName: 'crack_vault',
+      tests: [TESTS[0]!], comparison: 'unordered', timeoutMs: 1500,
+    });
+    expect(Date.now() - t0).toBeLessThan(4000);
+    expect(out.results[0]!.pass).toBe(true);
+  }, 10_000);
+
+  it('kills the whole group on timeout, including the forked child', async () => {
+    const code = `import subprocess
+def crack_vault(codes, target):
+    subprocess.Popen(["sleep", "32"])
+    while True:
+        pass
+`;
+    const t0 = Date.now();
+    const out = await execute({
+      language: 'python', code, functionName: 'crack_vault',
+      tests: [TESTS[0]!], comparison: 'unordered', timeoutMs: 1000,
+    });
+    expect(Date.now() - t0).toBeLessThan(4000);
+    expect(out.timedOut).toBe(true);
+    await new Promise((r) => setTimeout(r, 200));
+    const { status } = spawnSync('pgrep', ['-f', 'sleep 32']);
+    expect(status).toBe(1); // no surviving match
+  }, 10_000);
+});
+
+describe('withSlot — concurrency limit', () => {
+  it('never exceeds EXEC_MAX_CONCURRENT, even for calls arriving as slots release', async () => {
+    const limit = BALANCE.EXEC_MAX_CONCURRENT;
+    let live = 0;
+    let max = 0;
+    const started: number[] = [];
+    const pending: Promise<void>[] = [];
+    let extras = 0;
+
+    const task = (n: number): Promise<void> => withSlot(() => {
+      live += 1;
+      max = Math.max(max, live);
+      started.push(n);
+      // A thenable (not a native promise) delays withSlot's wake-up by a tick,
+      // letting a fresh call land in the window between release and hand-off.
+      return {
+        then(resolve: () => void) {
+          setTimeout(() => {
+            live -= 1;
+            resolve();
+            if (extras < limit) {
+              extras += 1;
+              queueMicrotask(() => { pending.push(task(1000 + extras)); });
+            }
+          }, 15);
+        },
+      } as unknown as Promise<void>;
+    });
+
+    const total = limit * 3;
+    for (let n = 0; n < total; n += 1) pending.push(task(n));
+    while (live > 0 || started.length < total + limit) await new Promise((r) => setTimeout(r, 20));
+    await Promise.all(pending);
+
+    expect(max).toBe(limit);
+    expect(started.slice(0, total)).toEqual([...Array(total).keys()]); // FIFO
+  });
+});
+
+describe('execute — stderr cap', () => {
+  it('bounds stderr accumulation for a submission that floods it', async () => {
+    const code = `import sys
+def crack_vault(codes, target):
+    chunk = "x" * 4096
+    while True:
+        sys.stderr.write(chunk)
+`;
+    const out = await execute({
+      language: 'python', code, functionName: 'crack_vault',
+      tests: [TESTS[0]!], comparison: 'unordered', timeoutMs: 1500,
+    });
+    expect(out.stderr.length).toBeLessThanOrEqual(BALANCE.EXEC_OUTPUT_CAP_BYTES + 64);
+    expect(out.stderr).toContain('[stderr truncated]');
+  }, 10_000);
+});

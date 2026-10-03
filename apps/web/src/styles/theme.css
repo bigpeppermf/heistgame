@@ -1,0 +1,114 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&display=swap');
+
+@theme {
+  --color-hc-bg: var(--hc-bg);
+  --color-hc-panel: var(--hc-panel);
+  --color-hc-line: var(--hc-line);
+  --color-hc-text: var(--hc-text);
+  --color-hc-dim: var(--hc-dim);
+  --color-hc-gold: var(--hc-gold);
+  --color-hc-cop: var(--hc-cop);
+  --color-hc-robber: var(--hc-robber);
+
+  --font-display: 'Bebas Neue', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+:root {
+  --hc-bg: #090a0f;
+  --hc-panel: #12141d;
+  --hc-line: #222634;
+  --hc-text: #f8fafc;
+  --hc-dim: #94a3b8;
+  --hc-gold: #fbbf24;
+  --hc-cop: #4a9ee8;
+  --hc-robber: #ef4444;
+
+  /* Additional tokens */
+  --hc-gold-dim: rgba(251, 191, 36, 0.15);
+  --hc-cop-dim: rgba(74, 158, 232, 0.15);
+  --hc-robber-dim: rgba(239, 68, 68, 0.15);
+  
+  --hc-radius-sm: 4px;
+  --hc-radius-md: 8px;
+  --hc-radius-lg: 12px;
+  
+  --hc-shadow-glow-gold: 0 0 15px rgba(251, 191, 36, 0.3);
+  --hc-shadow-glow-cop: 0 0 15px rgba(74, 158, 232, 0.3);
+  --hc-shadow-glow-robber: 0 0 15px rgba(239, 68, 68, 0.3);
+}
+
+body {
+  background-color: var(--hc-bg);
+  color: var(--hc-text);
+  font-family: var(--font-mono);
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Utilities */
+.hc-panel {
+  background-color: var(--hc-panel);
+  border: 1px solid var(--hc-line);
+  border-radius: var(--hc-radius-md);
+  padding: 1rem;
+}
+
+.hc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--hc-radius-sm);
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid var(--hc-line);
+  background: var(--hc-bg);
+  color: var(--hc-text);
+  text-transform: uppercase;
+}
+
+.hc-btn:hover {
+  background: var(--hc-panel);
+  border-color: var(--hc-dim);
+}
+
+.hc-btn-primary {
+  background-color: var(--hc-gold);
+  color: #000;
+  border-color: var(--hc-gold);
+}
+
+.hc-btn-primary:hover {
+  background-color: #f59e0b;
+  border-color: #f59e0b;
+  box-shadow: var(--hc-shadow-glow-gold);
+}
+
+.hc-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--hc-radius-sm);
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  background-color: var(--hc-line);
+  color: var(--hc-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.hc-mono {
+  font-family: var(--font-mono);
+}
+
+.hc-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HEISTCODE Styleguide</title>
+  <link rel="stylesheet" href="./apps/web/src/styles/theme.css">
+  <style>
+    body {
+      padding: 2rem;
+      position: relative;
+    }
+    .noise-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: url('./apps/web/public/noise.svg');
+      opacity: 0.1;
+      pointer-events: none;
+      z-index: 999;
+    }
+    .section {
+      margin-bottom: 4rem;
+      border-bottom: 1px solid var(--hc-line);
+      padding-bottom: 2rem;
+    }
+    .swatch-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 1rem;
+    }
+    .swatch {
+      height: 100px;
+      border-radius: var(--hc-radius-md);
+      border: 1px solid var(--hc-line);
+    }
+    .swatch-label {
+      margin-top: 0.5rem;
+      font-size: 0.875rem;
+    }
+    .icon-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+    }
+    .icon-row {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      background: var(--hc-panel);
+      padding: 1rem;
+      border: 1px solid var(--hc-line);
+      border-radius: var(--hc-radius-md);
+    }
+    .icon-sizes {
+      display: flex;
+      align-items: flex-end;
+      gap: 1rem;
+      color: var(--hc-text);
+    }
+    .board-container {
+      display: flex;
+      gap: 2rem;
+      align-items: flex-end;
+    }
+    .board-demo {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .board-demo .marker {
+      position: absolute;
+      top: 10px;
+      z-index: 10;
+    }
+    h2 {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      color: var(--hc-gold);
+      margin-top: 0;
+    }
+    h1 {
+      font-family: var(--font-display);
+      font-size: 4rem;
+      margin-bottom: 0.5rem;
+      color: var(--hc-text);
+    }
+    .desc {
+      color: var(--hc-dim);
+      margin-bottom: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="noise-overlay"></div>
+
+  <h1>HEISTCODE</h1>
+  <p class="desc hc-mono">Visual Identity & Asset Pack Preview</p>
+
+  <div class="section">
+    <h2>Color Tokens</h2>
+    <div class="swatch-grid">
+      <div><div class="swatch" style="background: var(--hc-bg)"></div><div class="swatch-label hc-mono">--hc-bg</div></div>
+      <div><div class="swatch" style="background: var(--hc-panel)"></div><div class="swatch-label hc-mono">--hc-panel</div></div>
+      <div><div class="swatch" style="background: var(--hc-line)"></div><div class="swatch-label hc-mono">--hc-line</div></div>
+      <div><div class="swatch" style="background: var(--hc-text)"></div><div class="swatch-label hc-mono">--hc-text</div></div>
+      <div><div class="swatch" style="background: var(--hc-dim)"></div><div class="swatch-label hc-mono">--hc-dim</div></div>
+      <div><div class="swatch" style="background: var(--hc-gold); box-shadow: var(--hc-shadow-glow-gold)"></div><div class="swatch-label hc-mono">--hc-gold</div></div>
+      <div><div class="swatch" style="background: var(--hc-cop); box-shadow: var(--hc-shadow-glow-cop)"></div><div class="swatch-label hc-mono">--hc-cop</div></div>
+      <div><div class="swatch" style="background: var(--hc-robber); box-shadow: var(--hc-shadow-glow-robber)"></div><div class="swatch-label hc-mono">--hc-robber</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Typography</h2>
+    <div class="hc-panel">
+      <div style="font-family: var(--font-display); font-size: 3rem; color: var(--hc-gold); margin-bottom: 1rem;">Bebas Neue (Display)</div>
+      <div style="font-family: var(--font-mono); font-size: 1rem; color: var(--hc-text); line-height: 1.5;">
+        JetBrains Mono (Monospace)<br>
+        const escapePlan = {<br>
+        &nbsp;&nbsp;cop: "approaching",<br>
+        &nbsp;&nbsp;robber: "hacking",<br>
+        &nbsp;&nbsp;timeRemaining: 150<br>
+        };
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Utility Classes</h2>
+    <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+      <div class="hc-panel">
+        <span class="hc-display">.hc-panel</span>
+      </div>
+      <button class="hc-btn">.hc-btn</button>
+      <button class="hc-btn hc-btn-primary">.hc-btn-primary</button>
+      <span class="hc-chip">.hc-chip</span>
+      <span class="hc-mono">.hc-mono text</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Icons (16px, 24px, 48px)</h2>
+    <div class="icon-grid" id="icon-container">
+      <!-- Injected by JS -->
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Board Pieces</h2>
+    <div class="board-container" id="board-container">
+      <!-- Injected by JS -->
+    </div>
+    <div style="margin-top: 2rem;">
+      <h3 class="hc-display">In Context Demo</h3>
+      <div class="board-container" style="gap: 0;" id="context-container">
+        <!-- Injected by JS -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const icons = [
+      { name: 'EMP', svg: '<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/><line x1="3" y1="3" x2="21" y2="21"/>' },
+      { name: 'BLACKOUT', svg: '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>' },
+      { name: 'JAMMED_COMMS', svg: '<path d="M2 8.82a15 15 0 0 1 4.11-3.23M5 12.859a10 10 0 0 1 2.18-1.55M8.5 16.429a5 5 0 0 1 .71-.4M16.5 16.03a5 5 0 0 1 .71.4M19 12.859a10 10 0 0 1 2.18 1.55M22 8.82a15 15 0 0 1-4.11 3.23"/><line x1="12" y1="20" x2="12" y2="10"/><line x1="10" y1="22" x2="14" y2="22"/><line x1="2" y1="2" x2="22" y2="22"/>' },
+      { name: 'SMOKE_BOMB', svg: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><path d="M8 19v3"/><path d="M12 19v3"/><path d="M16 19v3"/>' },
+      { name: 'ROADBLOCK', svg: '<rect x="2" y="9" width="20" height="6" rx="1"/><path d="M5 15v4"/><path d="M19 15v4"/><path d="M7 9l5 6"/><path d="M12 9l5 6"/>' },
+      { name: 'GETAWAY_CAR', svg: '<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M14 10h-8"/>' },
+      { name: 'SHIELD', svg: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' }
+    ];
+
+    const iconContainer = document.getElementById('icon-container');
+    icons.forEach(icon => {
+      const sizes = [16, 24, 48];
+      const svgs = sizes.map(size => `
+        <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          ${icon.svg}
+        </svg>
+      `).join('');
+      
+      iconContainer.innerHTML += `
+        <div class="icon-row">
+          <div class="hc-mono" style="font-size: 0.75rem; color: var(--hc-dim)">${icon.name}</div>
+          <div class="icon-sizes">${svgs}</div>
+        </div>
+      `;
+    });
+
+    const boardPieces = {
+      copMarker: '<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M24 4L8 12V22C8 31 14.5 40 24 44C33.5 40 40 31 40 22V12L24 4Z" fill="var(--hc-cop)" stroke="var(--hc-bg)" stroke-width="4"/><path d="M24 14L27 21H35L28.5 26L31 34L24 29L17 34L19.5 26L13 21H21L24 14Z" fill="var(--hc-bg)"/></svg>',
+      robberMarker: '<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="14" width="40" height="20" rx="10" fill="var(--hc-robber)" stroke="var(--hc-bg)" stroke-width="4"/><circle cx="16" cy="24" r="5" fill="var(--hc-bg)"/><circle cx="32" cy="24" r="5" fill="var(--hc-bg)"/><path d="M22 24C22 22 26 22 26 24" stroke="var(--hc-bg)" stroke-width="2" stroke-linecap="round"/></svg>',
+      tilePlain: '<svg width="80" height="80" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="16" width="56" height="32" rx="4" fill="var(--hc-panel)" stroke="var(--hc-line)" stroke-width="2"/><path d="M12 32H52" stroke="var(--hc-line)" stroke-width="2" stroke-dasharray="4 4"/></svg>',
+      tileStash: '<svg width="80" height="80" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="16" width="56" height="32" rx="4" fill="var(--hc-panel)" stroke="var(--hc-gold)" stroke-width="2"/><path d="M32 20L36 26L42 28L37 32L39 38L32 35L25 38L27 32L22 28L28 26L32 20Z" fill="var(--hc-gold)"/></svg>',
+      tileEscape: '<svg width="80" height="80" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="16" width="56" height="32" rx="4" fill="var(--hc-gold)" stroke="var(--hc-gold)" stroke-width="2"/><path d="M26 22H38V42H26V22Z" fill="var(--hc-bg)"/><path d="M34 32H36" stroke="var(--hc-gold)" stroke-width="2" stroke-linecap="round"/><path d="M44 32L52 32M52 32L48 28M52 32L48 36" stroke="var(--hc-bg)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    };
+
+    const boardContainer = document.getElementById('board-container');
+    
+    boardContainer.innerHTML = `
+      <div style="text-align: center;"><div class="hc-mono" style="margin-bottom:1rem; color:var(--hc-dim)">Cop Marker</div>${boardPieces.copMarker}</div>
+      <div style="text-align: center;"><div class="hc-mono" style="margin-bottom:1rem; color:var(--hc-dim)">Robber Marker</div>${boardPieces.robberMarker}</div>
+      <div style="text-align: center;"><div class="hc-mono" style="margin-bottom:1rem; color:var(--hc-dim)">Plain Tile</div>${boardPieces.tilePlain}</div>
+      <div style="text-align: center;"><div class="hc-mono" style="margin-bottom:1rem; color:var(--hc-dim)">Stash Tile</div>${boardPieces.tileStash}</div>
+      <div style="text-align: center;"><div class="hc-mono" style="margin-bottom:1rem; color:var(--hc-dim)">Escape Tile</div>${boardPieces.tileEscape}</div>
+    `;
+
+    const contextContainer = document.getElementById('context-container');
+    contextContainer.innerHTML = `
+      <div class="board-demo">
+        <div class="marker">${boardPieces.copMarker}</div>
+        <div>${boardPieces.tilePlain}</div>
+      </div>
+      <div class="board-demo">
+        <div>${boardPieces.tilePlain}</div>
+      </div>
+      <div class="board-demo">
+        <div class="marker">${boardPieces.robberMarker}</div>
+        <div>${boardPieces.tileStash}</div>
+      </div>
+      <div class="board-demo">
+        <div>${boardPieces.tilePlain}</div>
+      </div>
+      <div class="board-demo">
+        <div>${boardPieces.tileEscape}</div>
+      </div>
+    `;
+  </script>
+</body>
+</html>
