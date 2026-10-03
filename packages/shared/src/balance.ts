@@ -1,3 +1,15 @@
+export type PhaseKey = 'ROLE_REVEAL' | 'ROUND_INTRO' | 'CODING' | 'JUDGING' | 'SCORING' | 'POWERUP' | 'MOVEMENT';
+
+const PHASE_MS = {
+  ROLE_REVEAL: 4_000,
+  ROUND_INTRO: 5_000,
+  CODING: 150_000,
+  JUDGING: 8_000,
+  SCORING: 8_000,
+  POWERUP: 10_000,
+  MOVEMENT: 4_000,
+} as const satisfies Record<PhaseKey, number>;
+
 export const BALANCE = {
   // board
   BOARD_MAX_TILE: 14,
@@ -26,15 +38,7 @@ export const BALANCE = {
   HOSTILE_PER_ROUND: 1,
 
   // phases (ms)
-  PHASE_MS: {
-    ROLE_REVEAL: 4_000,
-    ROUND_INTRO: 5_000,
-    CODING: 150_000,
-    JUDGING: 8_000,
-    SCORING: 8_000,
-    POWERUP: 10_000,
-    MOVEMENT: 4_000,
-  },
+  PHASE_MS,
 
   // execution
   EXEC_TIMEOUT_MS: 5_000,
@@ -57,12 +61,12 @@ export const FAST_MATCH_PHASE_MS = {
   ROLE_REVEAL: 1_000,
   ROUND_INTRO: 1_000,
   CODING: 20_000,
-  JUDGING: 8_000,
+  JUDGING: BALANCE.PHASE_MS.JUDGING,
   SCORING: 2_000,
   POWERUP: 4_000,
   MOVEMENT: 1_000,
-};
+} satisfies Record<PhaseKey, number>;
 
-export function phaseDurations(fast: boolean) {
+export function phaseDurations(fast: boolean): Record<PhaseKey, number> {
   return fast ? FAST_MATCH_PHASE_MS : BALANCE.PHASE_MS;
 }
