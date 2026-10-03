@@ -143,7 +143,7 @@ export default function MatchPage({ params }: { params: Promise<{ code: string }
   }
 
   const oppProgress = opponent ? progress[opponent.id] : undefined;
-  const showScores = !!roundResult && (phase === 'SCORING' || phase === 'POWERUP' || phase === 'MOVEMENT');
+  const showScores = !!roundResult && phase === 'SCORING';
 
   return (
     <main className="relative flex h-screen flex-col">
