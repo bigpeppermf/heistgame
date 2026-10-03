@@ -5,3 +5,7 @@ dist/
 .env
 .env.local
 .remember/
+
+# Next.js generated
+apps/web/next-env.d.ts
+.next/
