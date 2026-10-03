@@ -86,14 +86,14 @@ export const PROBLEMS: Problem[] = [
   },
   {
     id: 'inside-job',
-    title: 'Spot the Inside Job',
+    title: 'Buy Low, Fence High',
     narrative:
-      'Guard coverage is logged hour by hour. Pick one hour to slip in and a later hour to slip ' +
-      'out, maximising the drop in coverage. Return the largest possible drop, or 0 if coverage never drops.',
+      'A fence quotes a price for the take every hour. Hand the goods over to him at one hour and ' +
+      'collect payment at a later hour. Return the largest profit you can make, or 0 if the price never rises.',
     functionName: { python: 'best_window', javascript: 'bestWindow' },
     starterCode: {
-      python: 'def best_window(coverage):\n    # coverage: list[int] of guard counts per hour\n    # return the largest later-minus-earlier drop, or 0\n    pass\n',
-      javascript: 'function bestWindow(coverage) {\n  // coverage: number[] of guard counts per hour\n  // return the largest later-minus-earlier drop, or 0\n}\n',
+      python: 'def best_window(coverage):\n    # coverage: list[int] of the fence price each hour\n    # return the largest later-minus-earlier profit, or 0\n    pass\n',
+      javascript: 'function bestWindow(coverage) {\n  // coverage: number[] of the fence price each hour\n  // return the largest later-minus-earlier profit, or 0\n}\n',
     },
     comparison: 'exact',
     sampleTests: [

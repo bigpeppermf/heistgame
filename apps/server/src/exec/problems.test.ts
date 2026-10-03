@@ -118,13 +118,15 @@ describe('every expected value is correct', () => {
   for (const problem of PROBLEMS) {
     for (const language of ['python', 'javascript'] as Language[]) {
       it(`${problem.id} / ${language}: reference solution passes all tests`, async () => {
+        const tests = [...problem.sampleTests, ...problem.hiddenTests];
         const out = await execute({
           language,
           code: REFERENCE[problem.id]![language],
           functionName: problem.functionName[language],
-          tests: [...problem.sampleTests, ...problem.hiddenTests],
+          tests,
           comparison: problem.comparison,
         });
+        expect(out.results.length).toBe(tests.length);
         const failures = out.results
           .filter((r) => !r.pass)
           .map((r) => `#${r.i} got ${JSON.stringify(r.actual)} err=${r.error ?? 'none'}`);
