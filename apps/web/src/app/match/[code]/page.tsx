@@ -25,7 +25,7 @@ export default function MatchPage({ params }: { params: Promise<{ code: string }
   const { code: roomCode } = use(params);
   const {
     snapshot, me, opponent, now, roundResult, runOutput, offer, setOffer,
-    gameOver, toast, notify, progress,
+    gameOver, toast, notify, progress, connectionError,
   } = useMatch(roomCode);
 
   const [language, setLanguage] = useState<Language>('python');
@@ -118,7 +118,14 @@ export default function MatchPage({ params }: { params: Promise<{ code: string }
   }
 
   if (!snapshot) {
-    return <main className="grid min-h-screen place-items-center">Connecting…</main>;
+    return (
+      <main className="grid min-h-screen place-items-center text-center">
+        <div>
+          <p>Connecting…</p>
+          {connectionError && <p className="mt-3" style={{ color: 'var(--hc-robber)' }}>{connectionError}</p>}
+        </div>
+      </main>
+    );
   }
 
   if (phase === 'LOBBY') {
