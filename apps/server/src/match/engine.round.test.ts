@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { BALANCE, FAST_MATCH_PHASE_MS, type TestResult } from '@heist/shared';
 import { MatchEngine, type EngineDeps, type ServerPlayer } from './engine.js';
 
@@ -115,6 +115,33 @@ describe('judging and scoring', () => {
     expect(h.engine.phase).toBe('SCORING');
     expect(h.engine.players.every((p) => p.lastScore !== null)).toBe(true);
     expect(h.engine.players.every((p) => p.lastScore!.passed === 0)).toBe(true);
+  });
+});
+
+describe('judging failure and staleness', () => {
+  it('survives a rejecting executor: reaches SCORING at the cap with no unhandled rejection', async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (e: unknown) => unhandled.push(e);
+    process.on('unhandledRejection', onUnhandled);
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const h = harness({});
+      h.deps.execute = async () => { throw new Error('spawn failed'); };
+      const { aId, bId } = await toCoding(h);
+      h.engine.submit(aId, 'a', 'python');
+      h.engine.submit(bId, 'b', 'python');
+      await new Promise((r) => setTimeout(r, 10)); // let the rejection surface
+      expect(unhandled).toEqual([]);
+      expect(errSpy).toHaveBeenCalled();
+
+      h.advance(BALANCE.PHASE_MS.JUDGING);
+      await h.engine.tick(h.at());
+      expect(h.engine.phase).toBe('SCORING');
+      expect(h.engine.players.every((p) => p.lastScore!.passed === 0)).toBe(true);
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+      errSpy.mockRestore();
+    }
   });
 });
 
@@ -275,6 +302,17 @@ describe('movement and win conditions', () => {
 
     expect(score.modifierDelta).toBe(-1);
     expect(b.position - before).toBe(score.tiles);
+
+    // round_result is sent again after movement with the final numbers.
+    const results = h.emitted.filter((e) => e.ev === 'round_result' && e.to === bId);
+    expect(results).toHaveLength(2);
+    const first = (results[0]!.payload as { scores: Record<string, { tiles: number; modifierDelta: number }> }).scores[bId]!;
+    const last = (results[1]!.payload as { scores: Record<string, { tiles: number; modifierDelta: number }> }).scores[bId]!;
+    expect(first.tiles).toBeGreaterThan(0); // provisional, never 0
+    expect(first.modifierDelta).toBe(0);
+    expect(last.modifierDelta).toBe(-1);
+    expect(last.tiles).toBe(score.tiles);
+    expect(last.tiles).not.toBe(first.tiles);
   });
 
   it('awards a power-up to a player who lands on a stash tile', async () => {

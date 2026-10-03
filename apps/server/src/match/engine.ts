@@ -55,6 +55,7 @@ export class MatchEngine {
   private judged = new Map<string, { passed: number; total: number; rubric: number; note: string }>();
   private judgingSettled = false;
   private judgingPromise: Promise<void> | null = null;
+  private judgingToken = 0;
 
   constructor(
     readonly roomCode: string,
@@ -192,14 +193,20 @@ export class MatchEngine {
   private enterJudging(): void {
     this.judged.clear();
     this.judgingSettled = false;
+    this.judgingToken += 1;
     this.goto('JUDGING');
-    this.judgingPromise = this.runJudging();
+    // execute() can reject (fs failure, spawn throw). Unhandled, that would
+    // terminate the whole process, so the rejection is always consumed here.
+    this.judgingPromise = this.runJudging().catch((err) => {
+      console.error(`[match ${this.roomCode}] judging failed`, err);
+    });
   }
 
   /** Kicks off execution and style judging for both players concurrently. */
   private async runJudging(): Promise<void> {
     const problem = this.currentProblem;
     if (!problem) return;
+    const token = this.judgingToken;
 
     await Promise.all(
       this.players.map(async (player) => {
@@ -213,6 +220,7 @@ export class MatchEngine {
             tests: problem.hiddenTests,
             comparison: problem.comparison,
           }, (r) => {
+            if (this.judgingToken !== token) return;
             if (r.pass) player.progress = (player.progress ?? 0) + 1;
             // A fine-grained event, not a full snapshot: 10 tests x 2 players
             // would otherwise be 20 whole-state broadcasts per round.
@@ -229,6 +237,7 @@ export class MatchEngine {
           }),
           this.deps.judgeStyle(sub.code, sub.language),
         ]);
+        if (this.judgingToken !== token) return;
         this.judged.set(player.id, {
           passed: exec.passed,
           total: problem.hiddenTests.length,
@@ -238,6 +247,7 @@ export class MatchEngine {
       }),
     );
 
+    if (this.judgingToken !== token) return;
     if (this.phase === 'JUDGING') this.finishJudging();
   }
 
@@ -270,14 +280,17 @@ export class MatchEngine {
         baseTiles: tilesForScore(s.total),
         modifierDelta: 0,
         speedBonus: player.id === bonusId ? BALANCE.SPEED_BONUS_TILES : 0,
+        // Provisional: modifiers are played during POWERUP, after this is sent.
         tiles: 0,
         passed: j.passed,
         totalTests: j.total,
         note: j.note,
       };
+      score.tiles = finalTiles(score.baseTiles, 0, score.speedBonus);
       player.lastScore = score;
       player.progress = j.passed;
-      scores[player.id] = score;
+      // A copy: resolveMovement() later mutates lastScore in place.
+      scores[player.id] = { ...score };
     }
 
     for (const player of this.players) {
@@ -344,10 +357,27 @@ export class MatchEngine {
       score.tiles = finalTiles(score.baseTiles, score.modifierDelta, score.speedBonus);
       player.position = advance(player.position, score.tiles);
     }
+
+    // Re-send with the final tiles and modifier deltas now that they are known.
+    const scores: Record<string, RoundScore> = {};
+    for (const player of this.players) {
+      if (player.lastScore) scores[player.id] = { ...player.lastScore };
+    }
+    for (const player of this.players) {
+      this.deps.emit(player.id, 'round_result', { round: this.round, scores });
+    }
     this.goto('MOVEMENT');
   }
 
   private afterMovement(): void {
+    const cop = this.players.find((p) => p.role === 'COP');
+    const robber = this.players.find((p) => p.role === 'ROBBER');
+    if (!cop || !robber) {
+      // Cannot resolve a match without both roles; end it rather than re-enter every tick.
+      this.goto('GAME_OVER');
+      return;
+    }
+
     // Landing on a stash tile earns one at random. This must run here, after
     // resolveMovement() has written the new positions, and before the win check
     // so a player who lands on a stash tile on a deciding round is still credited.
@@ -356,10 +386,6 @@ export class MatchEngine {
         awardPowerup(player, randomPowerup());
       }
     }
-
-    const cop = this.players.find((p) => p.role === 'COP');
-    const robber = this.players.find((p) => p.role === 'ROBBER');
-    if (!cop || !robber) return;
 
     const outcome = checkWin(cop.position, robber.position, this.round);
     if (outcome) {
