@@ -162,7 +162,19 @@ async function runOnce(
     });
 
     child.stderr.setEncoding('utf8');
-    child.stderr.on('data', (chunk: string) => { stderr += chunk; });
+    // Separate budget of the same size as stdout's.
+    let errBytes = 0;
+    let errCapped = false;
+    child.stderr.on('data', (chunk: string) => {
+      if (errCapped) return;
+      errBytes += chunk.length;
+      if (errBytes > BALANCE.EXEC_OUTPUT_CAP_BYTES) {
+        errCapped = true;
+        stderr += `${chunk.slice(0, Math.max(0, BALANCE.EXEC_OUTPUT_CAP_BYTES - (errBytes - chunk.length)))}\n[stderr truncated]`;
+        return;
+      }
+      stderr += chunk;
+    });
 
     // Resolve on 'exit', not 'close': a surviving grandchild holding the
     // pipe would keep 'close' from ever firing. Kill any leftovers, give the

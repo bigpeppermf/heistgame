@@ -318,3 +318,20 @@ describe('withSlot — concurrency limit', () => {
     expect(started.slice(0, total)).toEqual([...Array(total).keys()]); // FIFO
   });
 });
+
+describe('execute — stderr cap', () => {
+  it('bounds stderr accumulation for a submission that floods it', async () => {
+    const code = `import sys
+def crack_vault(codes, target):
+    chunk = "x" * 4096
+    while True:
+        sys.stderr.write(chunk)
+`;
+    const out = await execute({
+      language: 'python', code, functionName: 'crack_vault',
+      tests: [TESTS[0]!], comparison: 'unordered', timeoutMs: 1500,
+    });
+    expect(out.stderr.length).toBeLessThanOrEqual(BALANCE.EXEC_OUTPUT_CAP_BYTES + 64);
+    expect(out.stderr).toContain('[stderr truncated]');
+  }, 10_000);
+});
