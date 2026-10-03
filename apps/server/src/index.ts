@@ -57,6 +57,10 @@ io.on('connection', (socket) => {
     const created = registry.create(nickname.slice(0, 20) || 'Anonymous');
     bind(created.roomCode, created.playerId);
     ack({ ok: true, data: created });
+    // The engine's own snapshot during addPlayer had no socket mapping yet;
+    // push one explicitly so the client never depends on `rejoin`.
+    const match = registry.get(created.roomCode);
+    if (match) socket.emit('snapshot', match.snapshotFor(created.playerId));
   });
 
   socket.on('join_room', ({ roomCode: code, nickname }, ack) => {
@@ -66,6 +70,8 @@ io.on('connection', (socket) => {
     if (!joined.ok) return ack(joined);
     bind(match.roomCode, joined.data.playerId);
     ack({ ok: true, data: { playerId: joined.data.playerId } });
+    // addPlayer emitted before the mapping existed, so that snapshot was dropped.
+    socket.emit('snapshot', match.snapshotFor(joined.data.playerId));
   });
 
   socket.on('rejoin', ({ roomCode: code, playerId: id }, ack) => {
