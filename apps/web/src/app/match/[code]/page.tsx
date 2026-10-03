@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { use, useEffect, useMemo, useRef, useState } from 'react';
 import { BALANCE, type Language, type PowerupType } from '@heist/shared';
 import { CodeEditor } from '@/components/CodeEditor';
@@ -15,7 +16,17 @@ import { ScorePanel } from '@/components/polished/ScorePanel';
 import { formatClock, remainingMs } from '@/lib/clock';
 import { bufferKey, loadBuffer, saveBuffer } from '@/lib/editorBuffer';
 import { ask, loadSession } from '@/lib/socket';
+import { roleLabel } from '@/components/polished/visuals';
 import { useMatch } from '@/lib/useMatch';
+
+const phaseLabels: Record<string, string> = {
+  ROLE_REVEAL: 'Meet your rival', ROUND_INTRO: 'Case the job', CODING: 'Crack the code',
+  JUDGING: 'Checking the take', SCORING: 'The verdict', POWERUP: 'Gear up', MOVEMENT: 'Make your move', GAME_OVER: 'Case closed',
+};
+
+function GameBrand() {
+  return <Link href="/" className="game-brand" aria-label="git money home"><img src="/landing/title.png" alt="git money" /></Link>;
+}
 
 const HOSTILE: PowerupType[] = ['EMP', 'BLACKOUT', 'JAMMED_COMMS', 'ROADBLOCK'];
 
@@ -117,27 +128,26 @@ export default function MatchPage({ params }: { params: Promise<{ code: string }
     if (!res.ok) notify(res.error);
   }
 
-  if (!snapshot) {
+  if (!snapshot || phase === 'LOBBY') {
     return (
-      <main className="grid min-h-screen place-items-center text-center">
-        <div>
-          <p>Connecting…</p>
-          {connectionError && <p className="mt-3" style={{ color: 'var(--hc-robber)' }}>{connectionError}</p>}
-        </div>
-      </main>
-    );
-  }
-
-  if (phase === 'LOBBY') {
-    return (
-      <main className="grid min-h-screen place-items-center text-center">
-        <div>
-          <p style={{ color: 'var(--hc-dim)' }}>Room code</p>
-          <p className="hc-display text-7xl tracking-widest" style={{ color: 'var(--hc-gold)' }}>
-            {snapshot.roomCode}
-          </p>
-          <p className="mt-4" style={{ color: 'var(--hc-dim)' }}>Waiting for your partner…</p>
-        </div>
+      <main className="game-theme game-waiting">
+        <header className="game-waiting-header"><GameBrand /><Link href="/" className="game-back">Back to home ↗</Link></header>
+        <section className="game-lobby-card">
+          <p className="game-eyebrow">{snapshot ? 'The crew starts here' : 'Establishing connection'}</p>
+          <h1>{snapshot ? 'One job. Two players.' : 'Calling the crew…'}</h1>
+          {snapshot ? <>
+            <p className="game-muted">Send this code to your partner.</p>
+            <div className="game-room-code" aria-label="Room code">{snapshot.roomCode}</div>
+            <button className="game-primary" onClick={async () => {
+              try { await navigator.clipboard.writeText(snapshot.roomCode); notify('Room code copied'); }
+              catch { notify('Select the room code to copy it.'); }
+            }}>{toast === 'Room code copied' ? 'Copied ✓' : 'Copy room code'}</button>
+            <p className="game-waiting-status"><span />Waiting for your partner…</p>
+            <p className="game-muted">{me?.nickname ?? 'Your crew'} · ready for the job</p>
+            {toast && toast !== 'Room code copied' && <p role="status">{toast}</p>}
+          </> : <p className="game-muted" role="status">{connectionError ?? 'Connecting to the game server…'}</p>}
+        </section>
+        <p className="game-waiting-footer">Two coders. One vault. Only one gets away.</p>
       </main>
     );
   }
@@ -146,25 +156,26 @@ export default function MatchPage({ params }: { params: Promise<{ code: string }
   const showScores = !!roundResult && phase === 'SCORING';
 
   return (
-    <main className="relative flex h-screen flex-col">
+    <main className="game-theme game-match relative flex flex-col">
       <header
-        className="flex items-center justify-between gap-3 border-b px-4 py-2"
+        className="game-hud"
         style={{ borderColor: 'var(--hc-line)' }}
       >
-        <div>
-          <span style={{ color: me?.role === 'COP' ? 'var(--hc-cop)' : 'var(--hc-robber)' }}>
-            {me?.role ?? '—'}
+        <div className="game-player">
+          <GameBrand />
+          <div><span style={{ color: me?.role === 'COP' ? 'var(--hc-cop)' : 'var(--hc-robber)' }}>
+            {me ? roleLabel(me.role) : '—'}
           </span>
           <span style={{ color: 'var(--hc-dim)' }}> · {me?.nickname}</span>
-          {me && <ActiveEffectBadges effects={me.activeEffects} now={now} />}
+          {me && <ActiveEffectBadges effects={me.activeEffects} now={now} />}</div>
         </div>
         <div className="text-center">
           <p className="text-xs" style={{ color: 'var(--hc-dim)' }}>
-            ROUND {round}/{BALANCE.TOTAL_ROUNDS} · {phase}
+            ROUND {round}/{BALANCE.TOTAL_ROUNDS} · {phaseLabels[phase ?? ''] ?? phase}
           </p>
-          <p className="text-2xl font-bold">{clock}</p>
+          <p className="game-clock">{clock}</p>
         </div>
-        <div className="text-right" style={{ color: 'var(--hc-dim)' }}>
+        <div className="game-opponent text-right" style={{ color: 'var(--hc-dim)' }}>
           {opponent?.nickname ?? 'waiting'}
           {opponent?.submitted ? ' · LOCKED IN' : ''}
           {opponent?.connected === false ? ' · DARK' : ''}
@@ -177,23 +188,24 @@ export default function MatchPage({ params }: { params: Promise<{ code: string }
       </header>
 
       {toast && (
-        <div className="px-4 py-1 text-center text-sm" style={{ background: 'var(--hc-panel)' }}>
+        <div role="status" className="game-toast px-4 py-1 text-center text-sm" style={{ background: 'var(--hc-panel)' }}>
           {toast}
         </div>
       )}
 
-      <section className="flex min-h-0 flex-1">
+      <section className="game-workspace flex min-h-0 flex-1">
         <aside
-          className="w-80 shrink-0 overflow-auto border-r p-4"
+          className="game-briefing shrink-0 overflow-auto border-r p-4"
           style={{ borderColor: 'var(--hc-line)' }}
         >
+          <p className="game-eyebrow">The job / {String(round).padStart(2, '0')}</p>
           {problem ? (
             <>
-              <h2 className="font-bold" style={{ color: 'var(--hc-gold)' }}>{problem.title}</h2>
+              <h2 className="game-problem-title font-bold" style={{ color: 'var(--hc-gold)' }}>{problem.title}</h2>
               <p className="mt-2 text-sm leading-relaxed">{problem.narrative}</p>
               <div className="mt-4 text-xs" style={{ color: 'var(--hc-dim)' }}>
                 {problem.sampleTests.map((t, i) => (
-                  <pre key={i} className="mt-2 whitespace-pre-wrap">
+                  <pre key={i} className="game-sample mt-2 whitespace-pre-wrap">
                     in  {JSON.stringify(t.input)}{'\n'}out {JSON.stringify(t.expected)}
                   </pre>
                 ))}
@@ -205,12 +217,13 @@ export default function MatchPage({ params }: { params: Promise<{ code: string }
         </aside>
 
         {coding ? (
-          <div className="flex min-w-0 flex-1 flex-col">
-            <div className="flex items-center gap-2 border-b px-3 py-2" style={{ borderColor: 'var(--hc-line)' }}>
+          <div className="game-editor-column flex min-w-0 flex-1 flex-col">
+            <div className="game-editor-toolbar flex items-center gap-2 border-b px-3 py-2" style={{ borderColor: 'var(--hc-line)' }}>
               {(['python', 'javascript'] as Language[]).map((l) => (
                 <button
                   key={l}
-                  className="rounded px-2 py-1 text-xs"
+                  className="game-language px-3 py-2 text-sm"
+                  aria-pressed={language === l}
                   style={{
                     background: language === l ? 'var(--hc-gold)' : 'transparent',
                     color: language === l ? '#000' : 'var(--hc-dim)',
@@ -223,7 +236,7 @@ export default function MatchPage({ params }: { params: Promise<{ code: string }
 
               <div className="ml-auto flex gap-2">
                 <button
-                  className="rounded border px-3 py-1 text-sm disabled:opacity-40"
+                  className="game-run border px-4 py-2 text-sm disabled:opacity-40"
                   style={{ borderColor: 'var(--hc-line)' }}
                   disabled={!!emp}
                   onClick={() => void run()}
@@ -231,7 +244,7 @@ export default function MatchPage({ params }: { params: Promise<{ code: string }
                   {emp ? `EMP ${secondsUntil(emp.expiresAt, now)}s` : 'RUN'}
                 </button>
                 <button
-                  className="rounded px-3 py-1 text-sm font-bold text-black disabled:opacity-40"
+                  className="game-primary px-4 py-2 text-sm text-black disabled:opacity-40"
                   style={{ background: 'var(--hc-gold)' }}
                   disabled={me?.submitted}
                   onClick={() => void submit()}
@@ -251,7 +264,7 @@ export default function MatchPage({ params }: { params: Promise<{ code: string }
               {blackout && <BlackoutOverlay secondsLeft={secondsUntil(blackout.expiresAt, now)} />}
             </div>
 
-            <div className="relative h-56 shrink-0 border-t" style={{ borderColor: 'var(--hc-line)' }}>
+            <div className="game-test-panel relative shrink-0 border-t" style={{ borderColor: 'var(--hc-line)' }}>
               <TestResults
                 results={runOutput?.results ?? []}
                 stdout={runOutput?.stdout ?? ''}
@@ -265,12 +278,13 @@ export default function MatchPage({ params }: { params: Promise<{ code: string }
             </div>
           </div>
         ) : (
-          <div className="min-w-0 flex-1 overflow-auto p-6">
+          <div className="game-board-stage min-w-0 flex-1 overflow-auto p-6">
+            <div className="game-stage-heading"><p className="game-eyebrow">Round {round} / {BALANCE.TOTAL_ROUNDS}</p><h1>{phaseLabels[phase ?? ''] ?? 'The chase'}</h1></div>
             {phase === 'ROLE_REVEAL' && me && (
               <p className="mb-6 text-center text-xl">
-                You are the{' '}
+                Your side:{' '}
                 <span style={{ color: me.role === 'COP' ? 'var(--hc-cop)' : 'var(--hc-robber)' }}>
-                  {me.role}
+                  {roleLabel(me.role)}
                 </span>
               </p>
             )}

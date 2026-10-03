@@ -494,7 +494,7 @@ export class MatchEngine {
       phase: this.phase,
       deadlineAt: this.deadlineAt,
       round: this.round,
-      problem: this.problem ? toPublicProblem(this.problem) : null,
+      problem: this.problem ? toPublicProblem(this.problem, this.players.find((player) => player.id === viewerId)?.role) : null,
       players: this.players.map((p) => this.viewOf(p, viewerId, now)),
       ...(this.winner ? { winner: this.winner } : {}),
     };

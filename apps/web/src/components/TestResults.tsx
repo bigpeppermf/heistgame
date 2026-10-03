@@ -11,13 +11,14 @@ type Props = {
 /** Plain results list. The jammed state is composed over it by the page. */
 export function TestResults({ results, stdout, stderr }: Props) {
   return (
-    <div className="h-full overflow-auto p-3 text-sm">
+    <div className="h-full overflow-auto p-4 text-sm">
+      <h3 className="game-eyebrow">Test feed {results.length > 0 && ` / ${results.filter(result => result.pass).length} of ${results.length} passed`}</h3>
       {stderr && (
         <pre className="mb-3 whitespace-pre-wrap" style={{ color: 'var(--hc-robber)' }}>{stderr}</pre>
       )}
 
       {results.map((r) => (
-        <div key={r.i} className="flex items-baseline gap-2">
+        <div key={r.i} className="game-test-row flex items-baseline gap-2">
           <span style={{ color: r.pass ? 'var(--hc-gold)' : 'var(--hc-robber)' }}>
             {r.pass ? 'PASS' : 'FAIL'}
           </span>

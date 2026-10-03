@@ -1,13 +1,13 @@
 'use client';
 
 import type { PlayerView, RoundScore } from './types';
-import { Emblem, hc, roleColor, tint } from './visuals';
+import { Emblem, hc, roleColor, roleLabel, tint } from './visuals';
 
 function ScoreCard({ player, score }: { player: PlayerView; score: RoundScore | undefined }) {
   const accent = roleColor(player.role);
   return (
-    <article className="flex min-w-0 flex-1 flex-col rounded-[24px] border p-4 sm:p-6" style={{ borderColor: tint(accent, 50), background: `linear-gradient(145deg, ${tint(accent, 14)}, ${hc.panel} 42%)` }}>
-      <div className="flex items-center gap-2"><Emblem role={player.role} size={21} /><span className="truncate text-sm font-black uppercase tracking-[.12em]" style={{ color: accent }}>{player.nickname}</span><span className="ml-auto text-[10px] font-bold uppercase tracking-wider" style={{ color: hc.dim }}>{player.role}</span></div>
+    <article className="flex min-w-0 flex-1 flex-col rounded-none border p-4 sm:p-6" style={{ borderColor: tint(accent, 50), background: `linear-gradient(145deg, ${tint(accent, 14)}, ${hc.panel} 42%)` }}>
+      <div className="flex items-center gap-2"><Emblem role={player.role} size={21} /><span className="truncate text-sm font-black uppercase tracking-[.12em]" style={{ color: accent }}>{player.nickname}</span><span className="ml-auto text-[10px] font-bold uppercase tracking-wider" style={{ color: hc.dim }}>{roleLabel(player.role)}</span></div>
       <div className="mt-5 flex items-end gap-3 border-b pb-4" style={{ borderColor: hc.line }}>
         <div className="text-[clamp(4.5rem,12vw,8rem)] font-black tabular-nums leading-[.8] tracking-[-.1em]" style={{ color: accent }}>{score?.tiles ?? '—'}</div>
         <div className="pb-1 text-sm font-black uppercase tracking-[.22em]" style={{ color: hc.dim }}>final<br />tiles</div>

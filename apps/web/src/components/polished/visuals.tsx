@@ -1,6 +1,7 @@
 'use client';
 
 import type { CSSProperties, ReactNode } from 'react';
+import { ROLE_LABELS } from '@heist/shared';
 import type { PowerupType, Role } from './types';
 
 export const hc = {
@@ -16,6 +17,8 @@ export const hc = {
 
 export const tint = (color: string, amount = 13) =>
   `color-mix(in srgb, ${color} ${amount}%, transparent)`;
+
+export const roleLabel = (role: Role) => ROLE_LABELS[role];
 
 export const roleColor = (role: Role) => role === 'COP' ? hc.cop : hc.robber;
 

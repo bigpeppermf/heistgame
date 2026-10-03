@@ -1,0 +1,56 @@
+@font-face { font-family: 'Ubuntu Mono'; font-style: normal; font-weight: 400; font-display: swap; src: url('/landing/ubuntu-mono.ttf') format('truetype'); }
+.landing {
+  --landing-gold: #ffae00;
+  --landing-orange: #f89306;
+  position: relative;
+  min-height: 100svh;
+  overflow: hidden;
+  background: linear-gradient(180deg, #10092b 0%, #2d2d27 96.635%, #2a4155 100%);
+  font-family: 'Ubuntu Mono', monospace;
+}
+.landing-scenery { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.landing-canvas { position: absolute; width: 1920px; height: 1080px; left: 50%; top: 0; transform-origin: top center; }
+.landing-city { position: absolute; left: -17px; top: 448px; width: 1970px; height: 632px; object-fit: cover; }
+.landing-light { position: absolute; }
+.landing-clouds { position: absolute; height: 1080px; }
+.landing-clouds img { position: absolute; object-fit: cover; max-width: none; }
+.landing-clouds-far { left: -5760px; top: 36px; width: 7680px; opacity: .52; }
+.landing-clouds-near { left: -11520px; top: 0; width: 13440px; }
+.landing-credits { position: relative; display: flex; gap: clamp(20px, 2.84vw, 55px); padding: 7px 12px; color: var(--landing-gold); font-size: clamp(16px, 1.823vw, 35px); line-height: 1; }
+.landing-title { position: absolute; top: 27.4svh; left: 50%; transform: translateX(-50%); margin: 0; width: 36.198vw; }
+.landing-title img { display: block; width: 100%; height: auto; }
+.landing-actions { position: absolute; top: 50svh; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
+.landing-play { position: relative; width: 6.25vw; height: 6.25vw; padding: 0; border: 0; background: none; cursor: pointer; margin-left: -.52vw; }
+.landing-play-art { position: absolute; top: 0; left: 0; width: 120px; height: 120px; transform-origin: top left; }
+.landing-triangle { position: absolute; display: block; transform: rotate(90deg); }
+.landing-triangle-outer { left: 0; top: 0; width: 120px; height: 120px; }
+.landing-triangle-inner { left: 10px; top: 10px; width: 100px; height: 100px; }
+.landing-triangle img { position: absolute; left: 6.7%; top: 0; max-width: none; }
+.landing-button { border: 0; border-radius: 0; background: var(--landing-orange); color: #020101; font: inherit; cursor: pointer; }
+.landing-join { width: 17.969vw; height: 3.802vw; margin-top: .938vw; font-size: 1.823vw; }
+.landing-start { width: 12.5vw; height: 3.021vw; margin-top: .99vw; font-size: 1.302vw; }
+.landing-button:hover { background: #ffae00; }
+.landing button:focus-visible, .landing input:focus-visible { outline: 3px solid #fff; outline-offset: 5px; }
+.landing-play:hover { filter: brightness(1.3); }
+.landing button:disabled { cursor: wait; opacity: .5; }
+.landing-error { position: absolute; top: 80%; width: 100%; text-align: center; color: #ffb3a9; }
+.landing-dialog { margin: auto; width: min(420px, calc(100vw - 32px)); padding: 32px; border: 1px solid var(--landing-orange); background: #100d20; color: #fff; font-family: inherit; }
+.landing-dialog::backdrop { background: #05030bc9; }
+.landing-dialog form { display: flex; flex-direction: column; gap: 12px; }
+.landing-dialog h2 { margin: 0 0 12px; font-size: 30px; color: var(--landing-gold); }
+.landing-close { position: absolute; right: 12px; top: 6px; border: 0; background: transparent; color: var(--landing-gold); font-size: 30px; cursor: pointer; }
+.landing-dialog input { width: 100%; padding: 12px; border: 1px solid #72677d; background: #ffffff08; color: #fff; font: inherit; font-size: 20px; }
+.landing-dialog .landing-button { margin-top: 12px; padding: 14px; font-size: 22px; }
+.landing-form-error { margin: 0; color: #ffb3a9; }
+.landing-code { text-transform: uppercase; letter-spacing: .18em; }
+@media (max-aspect-ratio: 4/3) {
+  .landing-title { width: min(85vw, 700px); top: 25svh; }
+  .landing-credits { flex-wrap: wrap; gap: 10px 24px; }
+  .landing-play { width: 90px; height: 90px; }
+  .landing-join { width: 280px; height: 60px; font-size: 28px; margin-top: 14px; }
+  .landing-start { width: 210px; height: 50px; font-size: 23px; margin-top: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing [data-node-id] { animation: none; }
+  .landing-light { opacity: .2; }
+}

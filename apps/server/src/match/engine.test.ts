@@ -105,6 +105,24 @@ describe('phase progression', () => {
     expect('hiddenTests' in (snap.problem as object)).toBe(false);
   });
 
+  it('sends the correct briefing to each player without changing the task', async () => {
+    const { engine, advance, at } = started();
+    advance(FAST_MATCH_PHASE_MS.ROLE_REVEAL);
+    await engine.tick(at());
+    const cop = engine.players.find(player => player.role === 'COP')!;
+    const crew = engine.players.find(player => player.role === 'ROBBER')!;
+    const copProblem = engine.snapshotFor(cop.id).problem!;
+    const crewProblem = engine.snapshotFor(crew.id).problem!;
+    expect(copProblem.title).toBe('Identify the Compromised Keycards');
+    expect(crewProblem.title).toBe('Match the Vault Codes');
+    expect(copProblem.sampleTests).toEqual(crewProblem.sampleTests);
+    expect(copProblem.starterCode).toEqual(crewProblem.starterCode);
+    expect(copProblem.functionName).toEqual(crewProblem.functionName);
+    expect(copProblem).not.toHaveProperty('hiddenTests');
+    expect(crewProblem).not.toHaveProperty('roleBriefings');
+    expect(engine.snapshotFor(cop.id).problem).toEqual(copProblem);
+  });
+
   it('advances to CODING with the coding deadline', async () => {
     const { engine, advance, at } = started();
     advance(FAST_MATCH_PHASE_MS.ROLE_REVEAL);

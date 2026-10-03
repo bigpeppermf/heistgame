@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import '../styles/theme.css';
+import '../styles/game.css';
 
 export const metadata: Metadata = {
-  title: 'HeistCode',
+  title: 'git money',
   description: 'Two coders. One vault. Only one gets away.',
 };
 

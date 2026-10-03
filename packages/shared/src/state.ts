@@ -3,6 +3,10 @@ export type Phase =
   | 'JUDGING' | 'SCORING' | 'POWERUP' | 'MOVEMENT' | 'GAME_OVER';
 
 export type Role = 'COP' | 'ROBBER';
+
+export const ROLE_LABELS: Record<Role, string> = { COP: 'Cops', ROBBER: 'Heist Crew' };
+
+export type ProblemBriefing = { title: string; narrative: string };
 export type Language = 'python' | 'javascript';
 export type Comparison = 'exact' | 'unordered' | 'float';
 
@@ -20,15 +24,18 @@ export type Problem = {
   starterCode: Record<Language, string>;
   sampleTests: TestCase[];
   hiddenTests: TestCase[];
+  /** Story framing only; both sides solve the same coding task. */
+  roleBriefings?: Record<Role, ProblemBriefing>;
   comparison: Comparison;
 };
 
 /** The snapshot-safe projection. Physically cannot carry hidden tests. */
-export type PublicProblem = Omit<Problem, 'hiddenTests'>;
+export type PublicProblem = Omit<Problem, 'hiddenTests' | 'roleBriefings'>;
 
-export function toPublicProblem(p: Problem): PublicProblem {
-  const { hiddenTests: _omit, ...rest } = p;
-  return rest;
+export function toPublicProblem(p: Problem, role?: Role): PublicProblem {
+  const { hiddenTests: _omit, roleBriefings, ...rest } = p;
+  const briefing = role ? roleBriefings?.[role] : undefined;
+  return briefing ? { ...rest, title: briefing.title, narrative: `${briefing.narrative} ${rest.narrative}` } : rest;
 }
 
 export type ActiveEffect = { type: PowerupType; expiresAt: number };
