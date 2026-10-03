@@ -130,6 +130,9 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     if (!roomCode || !playerId) return;
+    // A reloading player may have already rebound to a new socket; do not
+    // clobber the new mapping when the old socket's disconnect arrives late.
+    if (sockets.get(playerId) !== socket.id) return;
     registry.get(roomCode)?.setConnected(playerId, false);
     sockets.delete(playerId);
   });
