@@ -38,6 +38,8 @@ describe('applyEffect', () => {
     const r = applyEffect(a, b, 'BLACKOUT', NOW, ROUND_END);
     expect(r).toEqual({ ok: false, reason: 'NOT_OWNED' });
     expect(b.activeEffects).toHaveLength(0);
+    expect(a.inventory).toEqual(['EMP', 'ROADBLOCK', 'GETAWAY_CAR']);
+    expect(a.hostileUsedThisRound).toBe(0);
   });
 
   it('a shield blocks the next hostile effect and is consumed', () => {
@@ -47,6 +49,7 @@ describe('applyEffect', () => {
     expect(b.shielded).toBe(false);
     expect(hasActiveEffect(b, 'EMP', NOW)).toBe(false);
     expect(a.inventory).not.toContain('EMP');
+    expect(a.hostileUsedThisRound).toBe(1);
   });
 
   it('a shield does not block a self effect', () => {
@@ -61,6 +64,7 @@ describe('applyEffect', () => {
     const second = applyEffect(a, b, 'ROADBLOCK', NOW, ROUND_END);
     expect(second).toEqual({ ok: false, reason: 'HOSTILE_CAP' });
     expect(a.inventory).toContain('ROADBLOCK');
+    expect(a.hostileUsedThisRound).toBe(1);
   });
 
   it('does not count self effects against the hostile cap', () => {
@@ -77,6 +81,8 @@ describe('applyEffect', () => {
   it('refuses to use SHIELD directly, since it auto-arms on award', () => {
     const c = player(['SHIELD']);
     expect(applyEffect(c, c, 'SHIELD', NOW, ROUND_END)).toEqual({ ok: false, reason: 'NOT_USABLE' });
+    expect(c.inventory).toContain('SHIELD');
+    expect(c.hostileUsedThisRound).toBe(0);
   });
 });
 

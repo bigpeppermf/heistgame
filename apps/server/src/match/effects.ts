@@ -20,7 +20,7 @@ export const EFFECTS: Record<PowerupType, EffectSpec> = {
   SHIELD:       { kind: 'reactive', hostile: false, durationMs: null,   delta: 0 },
 };
 
-/** Every power-up except SHIELD, which is never stored or used directly. */
+/** All seven power-ups are awardable; SHIELD is auto-armed on award rather than stored in inventory. */
 const AWARDABLE = Object.keys(EFFECTS) as PowerupType[];
 
 export type EffectPlayer = {
