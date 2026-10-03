@@ -1,5 +1,5 @@
 import {
-  BALANCE, type ActiveEffect, type PendingModifier, type PowerupType,
+  BALANCE, type ActiveEffect, type PendingModifier, type Phase, type PowerupType,
 } from '@heist/shared';
 
 export type EffectSpec = {
@@ -103,4 +103,15 @@ export function resetRound(player: EffectPlayer): void {
 
 export function randomPowerup(rng: () => number = Math.random): PowerupType {
   return AWARDABLE[Math.floor(rng() * AWARDABLE.length)]!;
+}
+
+/**
+ * Phase legality, per spec section 9. Checked BEFORE applyEffect so an
+ * illegal attempt never consumes the item.
+ */
+export function isUsableInPhase(type: PowerupType, phase: Phase): boolean {
+  const spec = EFFECTS[type];
+  if (spec.kind === 'reactive') return false;
+  if (spec.kind === 'timed') return phase === 'CODING';
+  return phase === 'POWERUP';
 }

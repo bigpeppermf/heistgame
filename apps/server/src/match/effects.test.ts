@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
-  applyEffect, awardPowerup, type EffectPlayer, hasActiveEffect,
+  applyEffect, awardPowerup, type EffectPlayer, hasActiveEffect, isUsableInPhase,
   pruneEffects, resetRound, sumModifiers,
 } from './effects.js';
 
@@ -131,5 +131,27 @@ describe('resetRound', () => {
     expect(p.hostileUsedThisRound).toBe(0);
     expect(p.inventory).toEqual(['EMP']);
     expect(p.shielded).toBe(true);
+  });
+});
+
+describe('isUsableInPhase', () => {
+  it('allows timed sabotage only while coding', () => {
+    expect(isUsableInPhase('EMP', 'CODING')).toBe(true);
+    expect(isUsableInPhase('BLACKOUT', 'CODING')).toBe(true);
+    expect(isUsableInPhase('SMOKE_BOMB', 'CODING')).toBe(true);
+    expect(isUsableInPhase('EMP', 'SCORING')).toBe(false);
+    expect(isUsableInPhase('EMP', 'POWERUP')).toBe(false);
+    expect(isUsableInPhase('EMP', 'LOBBY')).toBe(false);
+  });
+
+  it('allows modifiers only during the power-up phase', () => {
+    expect(isUsableInPhase('ROADBLOCK', 'POWERUP')).toBe(true);
+    expect(isUsableInPhase('GETAWAY_CAR', 'POWERUP')).toBe(true);
+    expect(isUsableInPhase('ROADBLOCK', 'CODING')).toBe(false);
+  });
+
+  it('never allows SHIELD to be used, in any phase', () => {
+    expect(isUsableInPhase('SHIELD', 'CODING')).toBe(false);
+    expect(isUsableInPhase('SHIELD', 'POWERUP')).toBe(false);
   });
 });
