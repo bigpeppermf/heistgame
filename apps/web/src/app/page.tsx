@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ask, saveSession } from '@/lib/socket';
 
 export default function Landing() {
@@ -10,6 +10,11 @@ export default function Landing() {
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const message = new URLSearchParams(window.location.search).get('error');
+    if (message) setError(message);
+  }, []);
 
   async function create() {
     setBusy(true);

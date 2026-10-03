@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import type {
   MatchSnapshot, PlayerView, PowerupType, Role, RoundScore, TestResult,
 } from '@heist/shared';
@@ -22,6 +23,7 @@ export type GameOver = { winner: Role; reason: 'CAUGHT' | 'ESCAPED' | 'EVADED' }
  * `now` exists solely to drive countdown displays against server deadlines.
  */
 export function useMatch(roomCode: string) {
+  const router = useRouter();
   const [snapshot, setSnapshot] = useState<MatchSnapshot | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [roundResult, setRoundResult] = useState<Record<string, RoundScore> | null>(null);
@@ -33,15 +35,25 @@ export function useMatch(roomCode: string) {
   const [playerId, setPlayerId] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
     const session = loadSession();
     const myId = session?.roomCode === roomCode ? session.playerId : null;
     setPlayerId(myId);
 
+    const leave = (message: string) => {
+      if (active) router.replace(`/?error=${encodeURIComponent(message)}`);
+    };
+    if (!myId) {
+      leave('No saved match session. Create or join a room.');
+      return () => { active = false; };
+    }
+
     const socket = getSocket();
 
     const rejoin = () => {
-      const s = loadSession();
-      if (s?.roomCode === roomCode) void ask('rejoin', { roomCode, playerId: s.playerId });
+      void ask('rejoin', { roomCode, playerId: myId }).then((res) => {
+        if (!res.ok) leave(`Could not rejoin match: ${res.error}`);
+      });
     };
 
     const onRoundResult = ({ scores }: { scores: Record<string, RoundScore> }) => setRoundResult(scores);
@@ -75,6 +87,7 @@ export function useMatch(roomCode: string) {
 
     const clock = setInterval(() => setNow(Date.now()), 200);
     return () => {
+      active = false;
       clearInterval(clock);
       socket.off('connect', rejoin);
       socket.off('snapshot', setSnapshot);
@@ -89,7 +102,7 @@ export function useMatch(roomCode: string) {
       socket.off('opponent_disconnected', onDark);
       socket.off('opponent_reconnected', onBack);
     };
-  }, [roomCode]);
+  }, [roomCode, router]);
 
   // Clear a toast after a moment.
   useEffect(() => {
