@@ -93,6 +93,7 @@ async function runOnce(
     const results: TestResult[] = [];
     let buffer = '';
     let stdout = '';
+    const seen = new Set<number>();
     let stderr = '';
     let bytes = 0;
     let capped = false;
@@ -110,19 +111,27 @@ async function runOnce(
       while ((nl = buffer.indexOf('\n')) !== -1) {
         const line = buffer.slice(0, nl);
         buffer = buffer.slice(nl + 1);
-        if (!line.startsWith(SENTINEL)) {
-          stdout += `${line}\n`;
-          continue;
-        }
+        // Anything unprefixed is anomalous: the harness captures the
+        // submission's own output and reports it via a protocol line.
+        if (!line.startsWith(SENTINEL)) continue;
         try {
           const raw = JSON.parse(line.slice(SENTINEL.length)) as {
-            i: number; ms: number; actual: unknown; error: string | null;
+            i?: unknown; ms?: unknown; actual?: unknown; error?: string | null; stdout?: unknown;
           };
-          const expected = opts.tests[raw.i]?.expected;
+          if (typeof raw.stdout === 'string' && raw.i === undefined) {
+            stdout = raw.stdout;
+            continue;
+          }
+          const i = raw.i;
+          if (typeof i !== 'number' || !Number.isInteger(i) || i < 0 || i >= opts.tests.length) continue;
+          if (seen.has(i)) continue;
+          seen.add(i);
+          const ms = typeof raw.ms === 'number' && Number.isFinite(raw.ms) ? raw.ms : 0;
+          const expected = opts.tests[i]?.expected;
           const result: TestResult = {
-            i: raw.i,
+            i,
             pass: raw.error ? false : compare(raw.actual, expected, opts.comparison),
-            ms: raw.ms,
+            ms,
             actual: raw.actual,
             ...(raw.error ? { error: raw.error } : {}),
           };
