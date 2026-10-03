@@ -7,8 +7,17 @@ import {
 import type { execute } from '../exec/runner.js';
 import type { judgeStyle } from '../judge/gemini.js';
 import {
-  hasActiveEffect, pruneEffects, resetRound, type EffectPlayer,
+  applyEffect, awardPowerup, EFFECTS, hasActiveEffect, isUsableInPhase,
+  pruneEffects, randomPowerup, resetRound, sumModifiers, type EffectPlayer,
 } from './effects.js';
+import {
+  advance, checkWin, finalTiles, rubricTotal, scoreSubmission, tilesForScore,
+} from './scoring.js';
+
+/** Hostile power-ups land on the opponent; everything else on the user. */
+function EFFECT_TARGET_IS_OPPONENT(type: PowerupType): boolean {
+  return EFFECTS[type].hostile;
+}
 
 export type EngineDeps = {
   now: () => number;
@@ -43,6 +52,9 @@ export class MatchEngine {
   winner?: { role: Role; reason: 'CAUGHT' | 'ESCAPED' | 'EVADED' };
 
   private problem: Problem | null = null;
+  private judged = new Map<string, { passed: number; total: number; rubric: number; note: string }>();
+  private judgingSettled = false;
+  private judgingPromise: Promise<void> | null = null;
 
   constructor(
     readonly roomCode: string,
@@ -137,7 +149,7 @@ export class MatchEngine {
     player.buffer = { code, language };
     this.pushSnapshots();
 
-    if (this.players.every((p) => p.submission)) this.goto('JUDGING');
+    if (this.players.every((p) => p.submission)) this.enterJudging();
     return { ok: true, data: { ok: true } };
   }
 
@@ -155,12 +167,257 @@ export class MatchEngine {
         return;
       case 'CODING':
         this.autoSubmit();
-        this.goto('JUDGING');
+        this.enterJudging();
+        return;
+      case 'JUDGING':
+        // Hard cap: settle with whatever arrived, fall back for the rest.
+        this.finishJudging();
+        return;
+      case 'SCORING':
+        this.enterPowerupPhase();
+        return;
+      case 'POWERUP':
+        this.resolveMovement();
+        return;
+      case 'MOVEMENT':
+        this.afterMovement();
         return;
       default:
-        // Task 10 handles JUDGING onward.
         return;
     }
+  }
+
+  // ---------------------------------------------------------------- judging
+
+  private enterJudging(): void {
+    this.judged.clear();
+    this.judgingSettled = false;
+    this.goto('JUDGING');
+    this.judgingPromise = this.runJudging();
+  }
+
+  /** Kicks off execution and style judging for both players concurrently. */
+  private async runJudging(): Promise<void> {
+    const problem = this.currentProblem;
+    if (!problem) return;
+
+    await Promise.all(
+      this.players.map(async (player) => {
+        const sub = player.submission;
+        if (!sub) return;
+        const [exec, rubric] = await Promise.all([
+          this.deps.execute({
+            language: sub.language,
+            code: sub.code,
+            functionName: problem.functionName[sub.language],
+            tests: problem.hiddenTests,
+            comparison: problem.comparison,
+          }, (r) => {
+            if (r.pass) player.progress = (player.progress ?? 0) + 1;
+            // A fine-grained event, not a full snapshot: 10 tests x 2 players
+            // would otherwise be 20 whole-state broadcasts per round.
+            for (const viewer of this.players) {
+              const concealed = viewer.id !== player.id
+                && hasActiveEffect(player, 'SMOKE_BOMB', this.deps.now());
+              if (concealed) continue;
+              this.deps.emit(viewer.id, 'test_progress', {
+                playerId: player.id,
+                done: player.progress ?? 0,
+                total: problem.hiddenTests.length,
+              });
+            }
+          }),
+          this.deps.judgeStyle(sub.code, sub.language),
+        ]);
+        this.judged.set(player.id, {
+          passed: exec.passed,
+          total: problem.hiddenTests.length,
+          rubric: rubricTotal(rubric),
+          note: rubric.note,
+        });
+      }),
+    );
+
+    if (this.phase === 'JUDGING') this.finishJudging();
+  }
+
+  /** Test seam: await the in-flight judging rather than starting a second one. */
+  async settleJudging(): Promise<void> {
+    await this.judgingPromise;
+  }
+
+  private finishJudging(): void {
+    if (this.judgingSettled) return;
+    this.judgingSettled = true;
+
+    const problem = this.currentProblem;
+    const totalTests = problem ? problem.hiddenTests.length : 0;
+
+    // Speed bonus: earliest submission that was fully correct.
+    const perfect = this.players
+      .filter((p) => (this.judged.get(p.id)?.passed ?? 0) === totalTests && totalTests > 0)
+      .sort((a, b) => (a.submission?.at ?? 0) - (b.submission?.at ?? 0));
+    const bonusId = perfect[0]?.id ?? null;
+
+    const scores: Record<string, RoundScore> = {};
+    for (const player of this.players) {
+      const j = this.judged.get(player.id) ?? { passed: 0, total: totalTests, rubric: 0, note: '' };
+      const s = scoreSubmission(j.passed, j.total, j.rubric);
+      const score: RoundScore = {
+        correctness: s.correctness,
+        style: s.style,
+        total: s.total,
+        baseTiles: tilesForScore(s.total),
+        modifierDelta: 0,
+        speedBonus: player.id === bonusId ? BALANCE.SPEED_BONUS_TILES : 0,
+        tiles: 0,
+        passed: j.passed,
+        totalTests: j.total,
+        note: j.note,
+      };
+      player.lastScore = score;
+      player.progress = j.passed;
+      scores[player.id] = score;
+    }
+
+    for (const player of this.players) {
+      this.deps.emit(player.id, 'round_result', { round: this.round, scores });
+    }
+    this.goto('SCORING');
+  }
+
+  // ---------------------------------------------------------------- awards
+
+  private enterPowerupPhase(): void {
+    this.goto('POWERUP');
+    const deadlineAt = this.deadlineAt ?? this.deps.now();
+
+    const totals = this.players.map((p) => p.lastScore?.total ?? 0);
+    const best = Math.max(...totals);
+    const soleLeader = totals.filter((t) => t === best).length === 1;
+
+    for (const player of this.players) {
+      const score = player.lastScore;
+      if (!score) continue;
+
+      // Perfect correctness earns one at random.
+      if (score.totalTests > 0 && score.passed === score.totalTests) {
+        awardPowerup(player, randomPowerup());
+      }
+
+      // The sole highest scorer picks one of two.
+      if (soleLeader && score.total === best) {
+        player.offer = [randomPowerup(), randomPowerup()];
+        this.deps.emit(player.id, 'powerup_offer', { options: player.offer, deadlineAt });
+      }
+    }
+    this.pushSnapshots();
+  }
+
+  chooseOffer(playerId: string, type: PowerupType): Result<{ ok: true }> {
+    if (this.phase !== 'POWERUP') return { ok: false, error: 'WRONG_PHASE' };
+    const player = this.find(playerId);
+    if (!player) return { ok: false, error: 'NO_SUCH_PLAYER' };
+    if (!player.offer?.includes(type)) return { ok: false, error: 'NOT_OFFERED' };
+    awardPowerup(player, type);
+    player.offer = null;
+    this.pushSnapshots();
+    return { ok: true, data: { ok: true } };
+  }
+
+  // -------------------------------------------------------------- movement
+
+  private resolveMovement(): void {
+    // An unclaimed offer resolves at random so the phase never stalls.
+    for (const player of this.players) {
+      if (player.offer) {
+        const pick = player.offer[Math.floor(Math.random() * player.offer.length)]!;
+        awardPowerup(player, pick);
+        player.offer = null;
+      }
+    }
+
+    for (const player of this.players) {
+      const score = player.lastScore;
+      if (!score) continue;
+      score.modifierDelta = sumModifiers(player);
+      score.tiles = finalTiles(score.baseTiles, score.modifierDelta, score.speedBonus);
+      player.position = advance(player.position, score.tiles);
+    }
+    this.goto('MOVEMENT');
+  }
+
+  private afterMovement(): void {
+    // Landing on a stash tile earns one at random. This must run here, after
+    // resolveMovement() has written the new positions, and before the win check
+    // so a player who lands on a stash tile on a deciding round is still credited.
+    for (const player of this.players) {
+      if (BALANCE.STASH_TILES.includes(player.position)) {
+        awardPowerup(player, randomPowerup());
+      }
+    }
+
+    const cop = this.players.find((p) => p.role === 'COP');
+    const robber = this.players.find((p) => p.role === 'ROBBER');
+    if (!cop || !robber) return;
+
+    const outcome = checkWin(cop.position, robber.position, this.round);
+    if (outcome) {
+      this.winner = outcome;
+      this.goto('GAME_OVER');
+      for (const player of this.players) {
+        this.deps.emit(player.id, 'game_over', { winner: outcome.role, reason: outcome.reason });
+      }
+      return;
+    }
+    this.startRound(this.round + 1);
+  }
+
+  // -------------------------------------------------------------- power-ups
+
+  usePowerup(playerId: string, type: PowerupType): Result<{ blocked: boolean }> {
+    const source = this.find(playerId);
+    if (!source) return { ok: false, error: 'NO_SUCH_PLAYER' };
+    if (!isUsableInPhase(type, this.phase)) return { ok: false, error: 'WRONG_PHASE' };
+
+    const spec = EFFECT_TARGET_IS_OPPONENT(type);
+    const target = spec ? this.players.find((p) => p.id !== playerId) : source;
+    if (!target) return { ok: false, error: 'NO_OPPONENT' };
+
+    const res = applyEffect(source, target, type, this.deps.now(), this.roundEndsAt());
+    if (!res.ok) return { ok: false, error: res.reason };
+
+    if (res.blocked) {
+      for (const p of this.players) this.deps.emit(p.id, 'effect_blocked', { targetId: target.id, type });
+    } else {
+      for (const p of this.players) {
+        this.deps.emit(p.id, 'effect_applied', {
+          sourceId: playerId, targetId: target.id, type, expiresAt: res.expiresAt,
+        });
+      }
+    }
+    this.pushSnapshots();
+    return { ok: true, data: { blocked: res.blocked } };
+  }
+
+  /**
+   * "Rest of the round" for Smoke Bomb. Progress only streams during JUDGING,
+   * so an expiry at the CODING deadline would conceal nothing.
+   */
+  private roundEndsAt(): number {
+    const d = phaseDurations(this.deps.fast);
+    const base = this.deadlineAt ?? this.deps.now();
+    return this.phase === 'CODING' ? base + d.JUDGING + d.SCORING : base;
+  }
+
+  canRun(playerId: string, now: number): Result<{ ok: true }> {
+    const player = this.find(playerId);
+    if (!player) return { ok: false, error: 'NO_SUCH_PLAYER' };
+    if (this.phase !== 'CODING') return { ok: false, error: 'WRONG_PHASE' };
+    if (hasActiveEffect(player, 'EMP', now)) return { ok: false, error: 'EMP_ACTIVE' };
+    if (now - player.lastRunAt < BALANCE.RUN_COOLDOWN_MS) return { ok: false, error: 'COOLDOWN' };
+    player.lastRunAt = now;
+    return { ok: true, data: { ok: true } };
   }
 
   private autoSubmit(): void {
