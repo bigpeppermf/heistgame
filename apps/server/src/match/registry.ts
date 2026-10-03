@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import { MatchEngine, type EngineDeps } from './engine.js';
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no O/0/I/1
@@ -5,7 +6,7 @@ const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no O/0/I/1
 function randomCode(): string {
   let out = '';
   for (let i = 0; i < 6; i += 1) {
-    out += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
+    out += ALPHABET[randomInt(ALPHABET.length)];
   }
   return out;
 }
