@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import { execute } from './runner.js';
 import type { TestCase } from '@heist/shared';
@@ -241,4 +242,40 @@ def crack_vault(codes, target):
     expect(out.stdout).toContain('loading');
     expect(out.results[0]!.pass).toBe(true);
   });
+});
+
+describe('execute — process groups', () => {
+  it('resolves within the timeout when the submission leaves a long-lived child holding the pipe', async () => {
+    const code = `import subprocess
+def crack_vault(codes, target):
+    subprocess.Popen(["sleep", "31"])
+    return [0, 1]
+`;
+    const t0 = Date.now();
+    const out = await execute({
+      language: 'python', code, functionName: 'crack_vault',
+      tests: [TESTS[0]!], comparison: 'unordered', timeoutMs: 1500,
+    });
+    expect(Date.now() - t0).toBeLessThan(4000);
+    expect(out.results[0]!.pass).toBe(true);
+  }, 10_000);
+
+  it('kills the whole group on timeout, including the forked child', async () => {
+    const code = `import subprocess
+def crack_vault(codes, target):
+    subprocess.Popen(["sleep", "32"])
+    while True:
+        pass
+`;
+    const t0 = Date.now();
+    const out = await execute({
+      language: 'python', code, functionName: 'crack_vault',
+      tests: [TESTS[0]!], comparison: 'unordered', timeoutMs: 1000,
+    });
+    expect(Date.now() - t0).toBeLessThan(4000);
+    expect(out.timedOut).toBe(true);
+    await new Promise((r) => setTimeout(r, 200));
+    const { status } = spawnSync('pgrep', ['-f', 'sleep 32']);
+    expect(status).toBe(1); // no surviving match
+  }, 10_000);
 });

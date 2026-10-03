@@ -85,10 +85,22 @@ async function runOnce(
         cwd: dir,
         // SCRUBBED. Never inherit process.env — see spec section 7.
         env: { PATH: process.env.PATH ?? '' },
-        timeout: opts.timeoutMs ?? BALANCE.EXEC_TIMEOUT_MS,
-        killSignal: 'SIGKILL',
+        // Own process group, so a fork/subprocess can be killed with the child.
+        detached: true,
       },
     );
+
+    let killed = false;
+    // Only ever signals the group this child leads (negative pid = that pgid).
+    // The group may already be gone, hence the try/catch.
+    const killGroup = () => {
+      if (child.pid === undefined) return;
+      try { process.kill(-child.pid, 'SIGKILL'); } catch { /* already gone */ }
+    };
+    const timer = setTimeout(() => {
+      killed = true;
+      killGroup();
+    }, opts.timeoutMs ?? BALANCE.EXEC_TIMEOUT_MS);
 
     const results: TestResult[] = [];
     let buffer = '';
@@ -103,7 +115,8 @@ async function runOnce(
       bytes += chunk.length;
       if (bytes > BALANCE.EXEC_OUTPUT_CAP_BYTES) {
         capped = true;
-        child.kill('SIGKILL');
+        killed = true;
+        killGroup();
         return;
       }
       buffer += chunk;
@@ -147,9 +160,25 @@ async function runOnce(
     child.stderr.setEncoding('utf8');
     child.stderr.on('data', (chunk: string) => { stderr += chunk; });
 
-    const killed = await new Promise<boolean>((resolve) => {
-      child.on('close', (_code, signal) => resolve(signal === 'SIGKILL'));
-      child.on('error', () => resolve(false));
+    // Resolve on 'exit', not 'close': a surviving grandchild holding the
+    // pipe would keep 'close' from ever firing. Kill any leftovers, give the
+    // pipes a brief moment to drain, then destroy them.
+    await new Promise<void>((resolve) => {
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        child.stdout.destroy();
+        child.stderr.destroy();
+        resolve();
+      };
+      child.on('close', finish);
+      child.on('error', finish);
+      child.on('exit', () => {
+        killGroup();
+        setTimeout(finish, 250);
+      });
     });
 
     // Backfill anything that never reported: hung, killed, or crashed mid-run.
