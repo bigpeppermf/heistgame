@@ -23,6 +23,14 @@ COPY packages/shared/package.json packages/shared/
 COPY apps/server/package.json apps/server/
 COPY apps/web/package.json apps/web/
 
+# The lockfile is written by npm 10, and the npm 11 that ships with node:24
+# rejects it: it expects a fuller set of platform-specific optional packages
+# (@esbuild/*, lightningcss-*, @rollup/rollup-*) and fails `npm ci` with
+# EUSAGE "not in sync". Pinning npm to the version that produced the lock
+# keeps the installed tree byte-identical to the one the test suite ran on,
+# which `npm install` would not guarantee.
+RUN npm install -g npm@10.9.2
+
 # NODE_ENV is deliberately NOT set yet: with NODE_ENV=production, npm would
 # omit devDependencies and strip out tsx, leaving the server unable to start.
 RUN npm ci
