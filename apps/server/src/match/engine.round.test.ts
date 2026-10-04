@@ -25,7 +25,7 @@ function harness(script: Record<string, Scripted>, opts: { stall?: boolean } = {
       const results: TestResult[] = Array.from({ length: n }, (_, i) => ({
         i, pass: i < passed, ms: 1,
       }));
-      return { results, stdout: '', stderr: '', timedOut: false, passed };
+      return { results, stdout: '', stderr: '', timedOut: false, outputCapped: false, passed };
     },
     // Spreads the scripted rubric total across the five criteria, largest first.
     judgeStyle: async (code) => {
@@ -119,7 +119,7 @@ describe('judging and scoring', () => {
 });
 
 describe('judging failure and staleness', () => {
-  it('survives a rejecting executor: reaches SCORING at the cap with no unhandled rejection', async () => {
+  it('survives a rejecting executor: resolves promptly with no unhandled rejection', async () => {
     const unhandled: unknown[] = [];
     const onUnhandled = (e: unknown) => unhandled.push(e);
     process.on('unhandledRejection', onUnhandled);
@@ -134,10 +134,20 @@ describe('judging failure and staleness', () => {
       expect(unhandled).toEqual([]);
       expect(errSpy).toHaveBeenCalled();
 
-      h.advance(BALANCE.PHASE_MS.JUDGING);
-      await h.engine.tick(h.at());
+      // Resolves on its own. A rejection used to escape Promise.all and skip
+      // finishJudging(), stranding BOTH players until the 8s hard cap.
       expect(h.engine.phase).toBe('SCORING');
       expect(h.engine.players.every((p) => p.lastScore!.passed === 0)).toBe(true);
+
+      const scores = h.engine.snapshotFor(aId).scores!;
+      expect(scores[aId]!.correctness).toBe(0);
+      // Still earns the floor movement, so the board cannot deadlock.
+      expect(scores[aId]!.tiles).toBe(BALANCE.MIN_TILES);
+
+      // The hard cap remains a backstop on top of prompt resolution.
+      h.advance(BALANCE.PHASE_MS.JUDGING);
+      await h.engine.tick(h.at());
+      expect(h.engine.phase).toBe('POWERUP');
     } finally {
       process.off('unhandledRejection', onUnhandled);
       errSpy.mockRestore();
@@ -368,5 +378,187 @@ describe('movement and win conditions', () => {
     await h.engine.tick(h.at());
     const a = h.engine.players.find((p) => p.id === aId)!;
     expect(a.inventory.length + (a.shielded ? 1 : 0)).toBeGreaterThan(0);
+  });
+});
+
+describe('snapshot recovery', () => {
+  /** Drives a scored round to the POWERUP phase, where A is the sole leader. */
+  async function toPowerup(h: ReturnType<typeof harness>) {
+    const { aId, bId } = await toCoding(h);
+    h.engine.submit(aId, 'code-A', 'python');
+    h.engine.submit(bId, 'code-B', 'python');
+    await h.engine.settleJudging();
+    h.advance(FAST_MATCH_PHASE_MS.SCORING);
+    await h.engine.tick(h.at());
+    return { aId, bId };
+  }
+
+  it('reports no offer and no scores before any round resolves', async () => {
+    const h = harness({});
+    const { aId } = await toCoding(h);
+    const snap = h.engine.snapshotFor(aId);
+    expect(snap.offer).toBeNull();
+    expect(snap.scores).toBeNull();
+  });
+
+  it('carries the viewer own offer and never the opponent one', async () => {
+    const h = harness({
+      'code-A': { passed: 10, total: 10, rubric: 20 },
+      'code-B': { passed: 2, total: 10, rubric: 0 },
+    });
+    const { aId, bId } = await toPowerup(h);
+
+    expect(h.engine.phase).toBe('POWERUP');
+    // A is the sole leader, so only A is offered a choice of two.
+    expect(h.engine.snapshotFor(aId).offer).toHaveLength(2);
+    expect(h.engine.snapshotFor(bId).offer).toBeNull();
+  });
+
+  it('carries the last round scores so a reload recovers the panel', async () => {
+    const h = harness({
+      'code-A': { passed: 10, total: 10, rubric: 20 },
+      'code-B': { passed: 5, total: 10, rubric: 10 },
+    });
+    const { aId, bId } = await toPowerup(h);
+
+    const scores = h.engine.snapshotFor(aId).scores;
+    expect(scores).not.toBeNull();
+    expect(scores![aId]!.correctness).toBe(BALANCE.CORRECTNESS_WEIGHT);
+    expect(scores![bId]!.passed).toBeGreaterThan(0);
+  });
+
+  it('exposes the hostile budget a client would otherwise track locally', async () => {
+    const h = harness({});
+    const { aId, bId } = await toCoding(h);
+    const a = h.engine.players.find((p) => p.id === aId)!;
+
+    expect(h.engine.snapshotFor(aId).players.find((p) => p.id === aId)!.hostileUsed).toBe(0);
+
+    a.inventory.push('EMP');
+    const used = h.engine.usePowerup(aId, 'EMP');
+    expect(used.ok).toBe(true);
+
+    // Visible to both players: effect_applied is broadcast, so this is no secret.
+    for (const viewer of [aId, bId]) {
+      expect(h.engine.snapshotFor(viewer).players.find((p) => p.id === aId)!.hostileUsed)
+        .toBe(BALANCE.HOSTILE_PER_ROUND);
+    }
+  });
+});
+
+describe('smoke bomb concealment', () => {
+  /** A plays Smoke Bomb during CODING, then both submit and the round is judged. */
+  async function smokedRound() {
+    const h = harness({
+      'code-A': { passed: 10, total: 10, rubric: 20 },
+      'code-B': { passed: 5, total: 10, rubric: 10 },
+    });
+    const { aId, bId } = await toCoding(h);
+    h.engine.players.find((p) => p.id === aId)!.inventory.push('SMOKE_BOMB');
+    expect(h.engine.usePowerup(aId, 'SMOKE_BOMB').ok).toBe(true);
+
+    h.engine.submit(aId, 'code-A', 'python');
+    h.engine.submit(bId, 'code-B', 'python');
+    await h.engine.settleJudging();
+    return { h, aId, bId };
+  }
+
+  it('zeroes the smoked player figures for the opponent but not for themselves', async () => {
+    const { h, aId, bId } = await smokedRound();
+    expect(h.engine.phase).toBe('SCORING');
+
+    const asOpponent = h.engine.snapshotFor(bId).scores![aId]!;
+    expect(asOpponent.concealed).toBe(true);
+    expect(asOpponent.correctness).toBe(0);
+    expect(asOpponent.total).toBe(0);
+    expect(asOpponent.passed).toBe(0);
+
+    const asSelf = h.engine.snapshotFor(aId).scores![aId]!;
+    expect(asSelf.concealed).toBeUndefined();
+    expect(asSelf.correctness).toBe(BALANCE.CORRECTNESS_WEIGHT);
+    expect(asSelf.passed).toBeGreaterThan(0);
+  });
+
+  it('leaves the tile count truthful, since the board reveals it anyway', async () => {
+    const { h, aId, bId } = await smokedRound();
+    const asOpponent = h.engine.snapshotFor(bId).scores![aId]!;
+    const asSelf = h.engine.snapshotFor(aId).scores![aId]!;
+    expect(asOpponent.tiles).toBe(asSelf.tiles);
+    expect(asOpponent.tiles).toBeGreaterThan(0);
+  });
+
+  it('never puts the concealed figures on the wire to the opponent', async () => {
+    const { h, aId, bId } = await smokedRound();
+    const toOpponent = h.emitted.filter((e) => e.to === bId && e.ev === 'round_result');
+    expect(toOpponent.length).toBeGreaterThan(0);
+
+    for (const ev of toOpponent) {
+      const { scores } = ev.payload as { scores: Record<string, { passed: number; concealed?: boolean }> };
+      expect(scores[aId]!.concealed).toBe(true);
+      expect(scores[aId]!.passed).toBe(0);
+    }
+    // The smoked player still receives their own true figures.
+    const toSelf = h.emitted.filter((e) => e.to === aId && e.ev === 'round_result');
+    const own = (toSelf.at(-1)!.payload as { scores: Record<string, { passed: number }> }).scores[aId]!;
+    expect(own.passed).toBeGreaterThan(0);
+  });
+});
+
+describe('shield is reactive, not playable', () => {
+  it('reports NOT_USABLE rather than blaming the phase', async () => {
+    const h = harness({});
+    const { aId } = await toCoding(h);
+    const res = h.engine.usePowerup(aId, 'SHIELD');
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toBe('NOT_USABLE');
+  });
+});
+
+describe('a round always resolves', () => {
+  /** Carries one round from CODING through MOVEMENT and into whatever follows. */
+  async function finishRound(h: ReturnType<typeof harness>, aId: string, bId: string, tag: string) {
+    h.engine.submit(aId, `a-${tag}`, 'python');
+    h.engine.submit(bId, `b-${tag}`, 'python');
+    await h.engine.settleJudging();
+    for (const phase of ['SCORING', 'POWERUP', 'MOVEMENT'] as const) {
+      h.advance(FAST_MATCH_PHASE_MS[phase]);
+      await h.engine.tick(h.at());
+    }
+    if (h.engine.phase === 'ROUND_INTRO') {
+      h.advance(FAST_MATCH_PHASE_MS.ROUND_INTRO);
+      await h.engine.tick(h.at());
+    }
+  }
+
+  it('plays all three rounds through to GAME_OVER with the robber evading', async () => {
+    const h = harness({});
+    const { aId, bId } = await toCoding(h);
+
+    for (let round = 1; round <= BALANCE.TOTAL_ROUNDS; round += 1) {
+      expect(h.engine.round).toBe(round);
+      await finishRound(h, aId, bId, String(round));
+    }
+
+    expect(h.engine.phase).toBe('GAME_OVER');
+    // Nobody solved anything, so neither side closed the 3-tile gap: the
+    // robber survives the full heist, which the spec awards to the robber.
+    expect(h.engine.winner).toEqual({ role: 'ROBBER', reason: 'EVADED' });
+    expect(h.emitted.filter((e) => e.ev === 'game_over')).toHaveLength(2);
+  });
+
+  it('keeps a disconnected player in the match and tells the opponent', async () => {
+    const h = harness({});
+    const { aId, bId } = await toCoding(h);
+
+    h.engine.setConnected(aId, false);
+    expect(h.engine.snapshotFor(bId).players.find((p) => p.id === aId)!.connected).toBe(false);
+    const gone = h.emitted.filter((e) => e.to === bId && e.ev === 'opponent_disconnected');
+    expect(gone).toHaveLength(1);
+    expect((gone[0]!.payload as { graceUntil: number }).graceUntil)
+      .toBe(h.at() + BALANCE.RECONNECT_GRACE_MS);
+
+    h.engine.setConnected(aId, true);
+    expect(h.engine.snapshotFor(bId).players.find((p) => p.id === aId)!.connected).toBe(true);
+    expect(h.emitted.filter((e) => e.to === bId && e.ev === 'opponent_reconnected')).toHaveLength(1);
   });
 });

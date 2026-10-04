@@ -22,7 +22,10 @@ export type ExecOutcome = {
   results: TestResult[];
   stdout: string;
   stderr: string;
+  /** True only for a wall-clock kill, never for the output cap. */
   timedOut: boolean;
+  /** True when the run was killed for exceeding the stdout budget. */
+  outputCapped: boolean;
   passed: number;
 };
 
@@ -94,7 +97,7 @@ async function runOnce(
       },
     );
 
-    let killed = false;
+    let timedOut = false;
     // Only ever signals the group this child leads (negative pid = that pgid).
     // The group may already be gone, hence the try/catch.
     const killGroup = () => {
@@ -102,7 +105,7 @@ async function runOnce(
       try { process.kill(-child.pid, 'SIGKILL'); } catch { /* already gone */ }
     };
     const timer = setTimeout(() => {
-      killed = true;
+      timedOut = true;
       killGroup();
     }, opts.timeoutMs ?? BALANCE.EXEC_TIMEOUT_MS);
 
@@ -116,10 +119,9 @@ async function runOnce(
 
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (chunk: string) => {
-      bytes += chunk.length;
+      bytes += Buffer.byteLength(chunk, 'utf8');
       if (bytes > BALANCE.EXEC_OUTPUT_CAP_BYTES) {
         capped = true;
-        killed = true;
         killGroup();
         return;
       }
@@ -136,7 +138,7 @@ async function runOnce(
             i?: unknown; ms?: unknown; actual?: unknown; error?: string | null; stdout?: unknown;
           };
           if (typeof raw.stdout === 'string' && raw.i === undefined) {
-            stdout = raw.stdout;
+            stdout += raw.stdout;
             continue;
           }
           const i = raw.i;
@@ -167,10 +169,13 @@ async function runOnce(
     let errCapped = false;
     child.stderr.on('data', (chunk: string) => {
       if (errCapped) return;
-      errBytes += chunk.length;
+      const chunkBytes = Buffer.byteLength(chunk, 'utf8');
+      errBytes += chunkBytes;
       if (errBytes > BALANCE.EXEC_OUTPUT_CAP_BYTES) {
         errCapped = true;
-        stderr += `${chunk.slice(0, Math.max(0, BALANCE.EXEC_OUTPUT_CAP_BYTES - (errBytes - chunk.length)))}\n[stderr truncated]`;
+        const room = Math.max(0, BALANCE.EXEC_OUTPUT_CAP_BYTES - (errBytes - chunkBytes));
+        // Slice by bytes, then back off any character split across the boundary.
+        stderr += `${Buffer.from(chunk, 'utf8').subarray(0, room).toString('utf8').replace(/\uFFFD$/, '')}\n[stderr truncated]`;
         return;
       }
       stderr += chunk;
@@ -198,9 +203,10 @@ async function runOnce(
     });
 
     // Backfill anything that never reported: hung, killed, or crashed mid-run.
+    const unreported = capped ? 'output_limit' : 'timeout';
     for (let i = 0; i < opts.tests.length; i += 1) {
       if (!results.some((r) => r.i === i)) {
-        results.push({ i, pass: false, ms: 0, error: 'timeout' });
+        results.push({ i, pass: false, ms: 0, error: unreported });
       }
     }
     results.sort((a, b) => a.i - b.i);
@@ -209,7 +215,8 @@ async function runOnce(
       results,
       stdout: capped ? `${stdout}\n[output truncated]` : stdout,
       stderr,
-      timedOut: killed,
+      timedOut,
+      outputCapped: capped,
       passed: results.filter((r) => r.pass).length,
     };
   } finally {

@@ -212,38 +212,52 @@ export class MatchEngine {
       this.players.map(async (player) => {
         const sub = player.submission;
         if (!sub) return;
-        const [exec, rubric] = await Promise.all([
-          this.deps.execute({
-            language: sub.language,
-            code: sub.code,
-            functionName: problem.functionName[sub.language],
-            tests: problem.hiddenTests,
-            comparison: problem.comparison,
-          }, (r) => {
-            if (this.judgingToken !== token) return;
-            if (r.pass) player.progress = (player.progress ?? 0) + 1;
-            // A fine-grained event, not a full snapshot: 10 tests x 2 players
-            // would otherwise be 20 whole-state broadcasts per round.
-            for (const viewer of this.players) {
-              const concealed = viewer.id !== player.id
-                && hasActiveEffect(player, 'SMOKE_BOMB', this.deps.now());
-              if (concealed) continue;
-              this.deps.emit(viewer.id, 'test_progress', {
-                playerId: player.id,
-                done: player.progress ?? 0,
-                total: problem.hiddenTests.length,
-              });
-            }
-          }),
-          this.deps.judgeStyle(sub.code, sub.language),
-        ]);
-        if (this.judgingToken !== token) return;
-        this.judged.set(player.id, {
-          passed: exec.passed,
-          total: problem.hiddenTests.length,
-          rubric: rubricTotal(rubric),
-          note: rubric.note,
-        });
+        try {
+          const [exec, rubric] = await Promise.all([
+            this.deps.execute({
+              language: sub.language,
+              code: sub.code,
+              functionName: problem.functionName[sub.language],
+              tests: problem.hiddenTests,
+              comparison: problem.comparison,
+            }, (r) => {
+              if (this.judgingToken !== token) return;
+              if (r.pass) player.progress = (player.progress ?? 0) + 1;
+              // A fine-grained event, not a full snapshot: 10 tests x 2 players
+              // would otherwise be 20 whole-state broadcasts per round.
+              for (const viewer of this.players) {
+                const concealed = viewer.id !== player.id
+                  && hasActiveEffect(player, 'SMOKE_BOMB', this.deps.now());
+                if (concealed) continue;
+                this.deps.emit(viewer.id, 'test_progress', {
+                  playerId: player.id,
+                  done: player.progress ?? 0,
+                  total: problem.hiddenTests.length,
+                });
+              }
+            }),
+            this.deps.judgeStyle(sub.code, sub.language),
+          ]);
+          if (this.judgingToken !== token) return;
+          this.judged.set(player.id, {
+            passed: exec.passed,
+            total: problem.hiddenTests.length,
+            rubric: rubricTotal(rubric),
+            note: rubric.note,
+          });
+        } catch (err) {
+          // Contained per player on purpose. Letting this reach Promise.all
+          // skipped finishJudging() entirely, so BOTH players sat in JUDGING
+          // until the 8s hard cap for one player's filesystem hiccup.
+          console.error(`[match ${this.roomCode}] judging ${player.id} failed`, err);
+          if (this.judgingToken !== token) return;
+          this.judged.set(player.id, {
+            passed: 0,
+            total: problem.hiddenTests.length,
+            rubric: 0,
+            note: 'The crew could not review this job.',
+          });
+        }
       }),
     );
 
@@ -269,7 +283,6 @@ export class MatchEngine {
       .sort((a, b) => (a.submission?.at ?? 0) - (b.submission?.at ?? 0));
     const bonusId = perfect[0]?.id ?? null;
 
-    const scores: Record<string, RoundScore> = {};
     for (const player of this.players) {
       const j = this.judged.get(player.id) ?? { passed: 0, total: totalTests, rubric: 0, note: '' };
       const s = scoreSubmission(j.passed, j.total, j.rubric);
@@ -289,13 +302,9 @@ export class MatchEngine {
       score.tiles = finalTiles(score.baseTiles, 0, score.speedBonus);
       player.lastScore = score;
       player.progress = j.passed;
-      // A copy: resolveMovement() later mutates lastScore in place.
-      scores[player.id] = { ...score };
     }
 
-    for (const player of this.players) {
-      this.deps.emit(player.id, 'round_result', { round: this.round, scores });
-    }
+    this.emitRoundResult();
     this.goto('SCORING');
   }
 
@@ -359,13 +368,7 @@ export class MatchEngine {
     }
 
     // Re-send with the final tiles and modifier deltas now that they are known.
-    const scores: Record<string, RoundScore> = {};
-    for (const player of this.players) {
-      if (player.lastScore) scores[player.id] = { ...player.lastScore };
-    }
-    for (const player of this.players) {
-      this.deps.emit(player.id, 'round_result', { round: this.round, scores });
-    }
+    this.emitRoundResult();
     this.goto('MOVEMENT');
   }
 
@@ -404,6 +407,9 @@ export class MatchEngine {
   usePowerup(playerId: string, type: PowerupType): Result<{ blocked: boolean }> {
     const source = this.find(playerId);
     if (!source) return { ok: false, error: 'NO_SUCH_PLAYER' };
+    // Shield is reactive: it arms on award and is never actively used, so no
+    // phase would ever permit it. Blaming the clock here misleads the client.
+    if (EFFECTS[type].kind === 'reactive') return { ok: false, error: 'NOT_USABLE' };
     if (!isUsableInPhase(type, this.phase)) return { ok: false, error: 'WRONG_PHASE' };
 
     const spec = EFFECT_TARGET_IS_OPPONENT(type);
@@ -489,15 +495,60 @@ export class MatchEngine {
 
   snapshotFor(viewerId: string): MatchSnapshot {
     const now = this.deps.now();
+    const viewer = this.find(viewerId);
     return {
       roomCode: this.roomCode,
       phase: this.phase,
       deadlineAt: this.deadlineAt,
       round: this.round,
-      problem: this.problem ? toPublicProblem(this.problem, this.players.find((player) => player.id === viewerId)?.role) : null,
+      problem: this.problem ? toPublicProblem(this.problem, viewer?.role) : null,
       players: this.players.map((p) => this.viewOf(p, viewerId, now)),
+      offer: viewer?.offer ? [...viewer.offer] : null,
+      scores: this.scoresFor(viewerId, now),
       ...(this.winner ? { winner: this.winner } : {}),
     };
+  }
+
+  /**
+   * Sent per viewer rather than broadcast: a concealed opponent's figures must
+   * never cross the wire to the player they are hidden from.
+   */
+  private emitRoundResult(): void {
+    const now = this.deps.now();
+    for (const viewer of this.players) {
+      this.deps.emit(viewer.id, 'round_result', {
+        round: this.round,
+        scores: this.scoresFor(viewer.id, now) ?? {},
+      });
+    }
+  }
+
+  /**
+   * The last round's scores as this viewer may see them, or null before any
+   * round has resolved. Built per viewer because Smoke Bomb's concealment is
+   * relative to who is looking.
+   */
+  private scoresFor(viewerId: string, now: number): Record<string, RoundScore> | null {
+    if (!this.players.some((p) => p.lastScore)) return null;
+    const out: Record<string, RoundScore> = {};
+    for (const p of this.players) {
+      if (p.lastScore) out[p.id] = this.scoreAsSeenBy(p, p.lastScore, viewerId, now);
+    }
+    return out;
+  }
+
+  /**
+   * Zeroes what Smoke Bomb is meant to hide rather than omitting the entry, so
+   * a client always has a row to render. Tiles, modifier and speed bonus stay
+   * truthful: the board visibly moves, so withholding them buys nothing.
+   */
+  private scoreAsSeenBy(
+    player: ServerPlayer, score: RoundScore, viewerId: string, now: number,
+  ): RoundScore {
+    if (player.id === viewerId || !hasActiveEffect(player, 'SMOKE_BOMB', now)) {
+      return { ...score };
+    }
+    return { ...score, correctness: 0, total: 0, passed: 0, note: '', concealed: true };
   }
 
   private viewOf(player: ServerPlayer, viewerId: string, now: number): PlayerView {
@@ -514,6 +565,7 @@ export class MatchEngine {
       submitted: player.submission !== null,
       connected: player.connected,
       progress: concealed ? null : player.progress,
+      hostileUsed: player.hostileUsedThisRound,
     };
   }
 

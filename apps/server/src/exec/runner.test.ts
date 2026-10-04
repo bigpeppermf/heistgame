@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { randomInt } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { execute, withSlot } from './runner.js';
 import { BALANCE, type TestCase } from '@heist/shared';
@@ -261,9 +262,12 @@ def crack_vault(codes, target):
   }, 10_000);
 
   it('kills the whole group on timeout, including the forked child', async () => {
+    // A unique duration, so pgrep can only ever match THIS test's grandchild.
+    // A bare `sleep 32` matched any unrelated process on the host.
+    const marker = `32.${randomInt(100_000, 999_999)}`;
     const code = `import subprocess
 def crack_vault(codes, target):
-    subprocess.Popen(["sleep", "32"])
+    subprocess.Popen(["sleep", "${marker}"])
     while True:
         pass
 `;
@@ -275,7 +279,7 @@ def crack_vault(codes, target):
     expect(Date.now() - t0).toBeLessThan(4000);
     expect(out.timedOut).toBe(true);
     await new Promise((r) => setTimeout(r, 200));
-    const { status } = spawnSync('pgrep', ['-f', 'sleep 32']);
+    const { status } = spawnSync('pgrep', ['-f', `sleep ${marker}`]);
     expect(status).toBe(1); // no surviving match
   }, 10_000);
 });
@@ -333,5 +337,76 @@ def crack_vault(codes, target):
     });
     expect(out.stderr.length).toBeLessThanOrEqual(BALANCE.EXEC_OUTPUT_CAP_BYTES + 64);
     expect(out.stderr).toContain('[stderr truncated]');
+  }, 10_000);
+});
+
+describe('debug output survives a kill', () => {
+  it('keeps the prints from tests that finished before a python hang', async () => {
+    // Test 0 prints and returns; test 1 prints, then hangs until the kill.
+    const code = `def crack_vault(codes, target):
+    print("probing", target)
+    if target == 6:
+        while True:
+            pass
+    return [0, 1]
+`;
+    const out = await execute({
+      language: 'python', code, functionName: 'crack_vault',
+      tests: TESTS, comparison: 'unordered', timeoutMs: 1500,
+    });
+
+    expect(out.timedOut).toBe(true);
+    // Before the per-test flush this was lost entirely: the single trailing
+    // stdout line never got the chance to be written.
+    expect(out.stdout).toContain('probing 9');
+    expect(out.stdout).toContain('probing 6');
+  }, 10_000);
+
+  it('keeps the logs from tests that finished before a javascript hang', async () => {
+    const code = `function crackVault(codes, target) {
+  console.log('probing', target);
+  if (target === 6) { while (true) {} }
+  return [0, 1];
+}
+`;
+    const out = await execute({
+      language: 'javascript', code, functionName: 'crackVault',
+      tests: TESTS, comparison: 'unordered', timeoutMs: 1500,
+    });
+
+    expect(out.timedOut).toBe(true);
+    expect(out.stdout).toContain('probing 9');
+    expect(out.stdout).toContain('probing 6');
+  }, 10_000);
+});
+
+describe('kill reasons are distinguishable', () => {
+  it('reports an output-cap kill as capped, not as a timeout', async () => {
+    // Returns far more than the runner's budget in one protocol line. Prints
+    // cannot do this: the harness caps captured output well below the runner.
+    const code = `def crack_vault(codes, target):
+    return ["x" * 100000] * 10
+`;
+    const out = await execute({
+      language: 'python', code, functionName: 'crack_vault',
+      tests: TESTS, comparison: 'unordered', timeoutMs: 8000,
+    });
+
+    expect(out.outputCapped).toBe(true);
+    // The distinction the player needs: the clock was never the problem.
+    expect(out.timedOut).toBe(false);
+    expect(out.results.every((r) => r.error !== 'timeout')).toBe(true);
+    expect(out.results.some((r) => r.error === 'output_limit')).toBe(true);
+    expect(out.stdout).toContain('[output truncated]');
+  }, 15_000);
+
+  it('reports a clean run as neither timed out nor capped', async () => {
+    const out = await execute({
+      language: 'python', code: PY_GOOD, functionName: 'crack_vault',
+      tests: TESTS, comparison: 'unordered',
+    });
+    expect(out.timedOut).toBe(false);
+    expect(out.outputCapped).toBe(false);
+    expect(out.passed).toBe(2);
   }, 10_000);
 });

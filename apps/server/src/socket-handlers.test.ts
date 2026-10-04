@@ -21,7 +21,7 @@ async function setup(runCode?: Parameters<typeof registerSocketHandlers>[3]) {
       const socketId = sockets.get(id);
       if (socketId) io.to(socketId).emit(event as keyof ServerToClientEvents, payload as never);
     },
-    execute: async () => ({ results: [], stdout: '', stderr: '', timedOut: false, passed: 0 }),
+    execute: async () => ({ results: [], stdout: '', stderr: '', timedOut: false, outputCapped: false, passed: 0 }),
     judgeStyle: async () => ({ naming: 0, readability: 0, comments: 0, organization: 0, simplicity: 0, note: '' }),
     fast: true,
   });
