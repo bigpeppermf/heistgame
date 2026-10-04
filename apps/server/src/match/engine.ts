@@ -60,7 +60,18 @@ export class MatchEngine {
   constructor(
     readonly roomCode: string,
     private readonly deps: EngineDeps,
+    /**
+     * A demo match. Runs on the short phase clock regardless of the server's
+     * FAST_MATCH setting, and hands the reference solution to its clients so a
+     * presenter can play a full game without typing one.
+     */
+    readonly demo: boolean = false,
   ) {}
+
+  /** Short phases when the server is in fast mode OR this is a demo match. */
+  private get fastMode(): boolean {
+    return this.deps.fast || this.demo;
+  }
 
   // ---------------------------------------------------------------- players
 
@@ -437,7 +448,7 @@ export class MatchEngine {
    * so an expiry at the CODING deadline would conceal nothing.
    */
   private roundEndsAt(): number {
-    const d = phaseDurations(this.deps.fast);
+    const d = phaseDurations(this.fastMode);
     const base = this.deadlineAt ?? this.deps.now();
     return this.phase === 'CODING' ? base + d.JUDGING + d.SCORING : base;
   }
@@ -475,7 +486,7 @@ export class MatchEngine {
   }
 
   protected goto(phase: Phase): void {
-    const durations = phaseDurations(this.deps.fast);
+    const durations = phaseDurations(this.fastMode);
     const ms = (durations as Record<string, number | undefined>)[phase];
     const from = this.phase;
     this.phase = phase;
@@ -501,8 +512,9 @@ export class MatchEngine {
       phase: this.phase,
       deadlineAt: this.deadlineAt,
       round: this.round,
-      problem: this.problem ? toPublicProblem(this.problem, viewer?.role) : null,
+      problem: this.problem ? toPublicProblem(this.problem, viewer?.role, this.demo) : null,
       players: this.players.map((p) => this.viewOf(p, viewerId, now)),
+      demo: this.demo,
       offer: viewer?.offer ? [...viewer.offer] : null,
       scores: this.scoresFor(viewerId, now),
       ...(this.winner ? { winner: this.winner } : {}),

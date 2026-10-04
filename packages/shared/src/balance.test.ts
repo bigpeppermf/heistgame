@@ -32,10 +32,14 @@ describe('toPublicProblem', () => {
       id: 'x', title: 'X', narrative: 'n',
       functionName: { python: 'f', javascript: 'f' },
       starterCode: { python: '', javascript: '' },
+      solution: { python: 'py', javascript: 'js' },
       sampleTests: [{ input: [1], expected: 1 }],
       hiddenTests: [{ input: [2], expected: 2 }],
       comparison: 'exact',
     };
     expect('hiddenTests' in toPublicProblem(p)).toBe(false);
+    // The reference answer is withheld unless a demo match asks for it.
+    expect('solution' in toPublicProblem(p)).toBe(false);
+    expect(toPublicProblem(p, undefined, true).solution).toEqual({ python: 'py', javascript: 'js' });
   });
 });

@@ -22,6 +22,8 @@ export type Problem = {
   narrative: string;
   functionName: Record<Language, string>;
   starterCode: Record<Language, string>;
+  /** A clean reference answer. Only ever sent to clients in a demo match. */
+  solution: Record<Language, string>;
   sampleTests: TestCase[];
   hiddenTests: TestCase[];
   /** Story framing only; both sides solve the same coding task. */
@@ -29,13 +31,23 @@ export type Problem = {
   comparison: Comparison;
 };
 
-/** The snapshot-safe projection. Physically cannot carry hidden tests. */
-export type PublicProblem = Omit<Problem, 'hiddenTests' | 'roleBriefings'>;
+/**
+ * The snapshot-safe projection. Physically cannot carry hidden tests, and
+ * carries the reference solution only when a demo match asks for it.
+ */
+export type PublicProblem =
+  Omit<Problem, 'hiddenTests' | 'roleBriefings' | 'solution'>
+  & { solution?: Record<Language, string> };
 
-export function toPublicProblem(p: Problem, role?: Role): PublicProblem {
-  const { hiddenTests: _omit, roleBriefings, ...rest } = p;
+export function toPublicProblem(
+  p: Problem, role?: Role, includeSolution = false,
+): PublicProblem {
+  const { hiddenTests: _omit, roleBriefings, solution, ...rest } = p;
   const briefing = role ? roleBriefings?.[role] : undefined;
-  return briefing ? { ...rest, title: briefing.title, narrative: `${briefing.narrative} ${rest.narrative}` } : rest;
+  const base: PublicProblem = briefing
+    ? { ...rest, title: briefing.title, narrative: `${briefing.narrative} ${rest.narrative}` }
+    : rest;
+  return includeSolution ? { ...base, solution } : base;
 }
 
 export type ActiveEffect = { type: PowerupType; expiresAt: number };
@@ -100,6 +112,11 @@ export type MatchSnapshot = {
   round: number;
   problem: PublicProblem | null;
   players: PlayerView[];
+  /**
+   * A demo match: phases run on the short FAST_MATCH clock and the problem
+   * carries its reference solution, so a presenter can show a full game.
+   */
+  demo: boolean;
   /** The viewer's own unclaimed power-up offer; null when there is none. */
   offer: PowerupType[] | null;
   /**

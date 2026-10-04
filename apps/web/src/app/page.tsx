@@ -30,6 +30,7 @@ export default function Landing() {
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [demo, setDemo] = useState(false);
 
   useEffect(() => {
     const message = new URLSearchParams(window.location.search).get('error');
@@ -39,7 +40,7 @@ export default function Landing() {
   async function create() {
     setBusy(true);
     setError(null);
-    const res = await ask<{ roomCode: string; playerId: string }>('create_room', { nickname: nickname.trim() });
+    const res = await ask<{ roomCode: string; playerId: string }>('create_room', { nickname: nickname.trim(), demo });
     setBusy(false);
     if (!res.ok) return setError(res.error);
     saveSession(res.data);
@@ -85,6 +86,12 @@ export default function Landing() {
             <label htmlFor="room-code">Room code</label>
             <input id="room-code" className="landing-code" autoComplete="off" value={code} maxLength={6} minLength={6} required disabled={busy} onChange={(event) => setCode(event.target.value.toUpperCase())} />
           </>}
+          {mode === 'create' && (
+            <label className="landing-demo">
+              <input type="checkbox" checked={demo} disabled={busy} onChange={(event) => setDemo(event.target.checked)} />
+              Demo mode — short rounds, solution on tap
+            </label>
+          )}
           {error && <p role="alert" className="landing-form-error">{error === 'TIMEOUT' ? 'Cannot reach the game server. Please try again.' : error}</p>}
           <button className="landing-button" disabled={!ready || (mode === 'join' && code.trim().length !== 6)} type="submit">{busy ? 'Connecting…' : mode === 'create' ? 'Start a game' : 'Join game'}</button>
         </form>

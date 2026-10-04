@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { BALANCE } from '@heist/shared';
+import { BALANCE, FAST_MATCH_PHASE_MS } from '@heist/shared';
 import { MatchRegistry } from './registry.js';
 
-function registry() {
+function registry(fast = true) {
   let clock = 5_000_000;
   const reg = new MatchRegistry({
     now: () => clock,
@@ -11,7 +11,7 @@ function registry() {
     judgeStyle: async () => ({
       naming: 0, readability: 0, comments: 0, organization: 0, simplicity: 0, note: '',
     }),
-    fast: true,
+    fast,
   });
   return { reg, advance: (ms: number) => { clock += ms; }, at: () => clock };
 }
@@ -63,5 +63,60 @@ describe('MatchRegistry', () => {
     advance(BALANCE.MATCH_DESTROY_MS * 3);
     reg.sweep(at());
     expect(reg.get(roomCode)).toBeDefined();
+  });
+});
+
+describe('demo matches', () => {
+  it('defaults to a normal match that withholds the solution', async () => {
+    const { reg, advance, at } = registry();
+    const { roomCode, playerId } = reg.create('Danny');
+    const engine = reg.get(roomCode)!;
+    expect(engine.demo).toBe(false);
+    expect(engine.snapshotFor(playerId).demo).toBe(false);
+
+    const second = engine.addPlayer('Rusty');
+    if (!second.ok) throw new Error('setup failed');
+    advance(FAST_MATCH_PHASE_MS.ROLE_REVEAL);
+    await engine.tick(at());
+
+    const problem = engine.snapshotFor(playerId).problem!;
+    expect(problem.starterCode.python).toBeTruthy();
+    // The reference answer must never reach a real match.
+    expect(problem.solution).toBeUndefined();
+  });
+
+  it('hands a demo match the reference solution for both languages', async () => {
+    const { reg, advance, at } = registry();
+    const { roomCode, playerId } = reg.create('Danny', true);
+    const engine = reg.get(roomCode)!;
+    expect(engine.demo).toBe(true);
+    expect(engine.snapshotFor(playerId).demo).toBe(true);
+
+    const second = engine.addPlayer('Rusty');
+    if (!second.ok) throw new Error('setup failed');
+    advance(FAST_MATCH_PHASE_MS.ROLE_REVEAL);
+    await engine.tick(at());
+
+    const problem = engine.snapshotFor(playerId).problem!;
+    expect(problem.solution?.python).toContain('def ');
+    expect(problem.solution?.javascript).toContain('function ');
+    // Both players get it; the presenter drives two laptops.
+    expect(engine.snapshotFor(second.data.playerId).problem!.solution).toBeDefined();
+  });
+
+  it('runs short phases even when the server is not in fast mode', () => {
+    const { reg, at } = registry(false);
+    const normal = reg.get(reg.create('A').roomCode)!;
+    const demo = reg.get(reg.create('B', true).roomCode)!;
+
+    for (const engine of [normal, demo]) {
+      const second = engine.addPlayer('partner');
+      if (!second.ok) throw new Error('setup failed');
+    }
+
+    // Both just entered ROLE_REVEAL; only the clock differs.
+    expect(normal.deadlineAt! - at()).toBe(BALANCE.PHASE_MS.ROLE_REVEAL);
+    expect(demo.deadlineAt! - at()).toBe(FAST_MATCH_PHASE_MS.ROLE_REVEAL);
+    expect(FAST_MATCH_PHASE_MS.ROLE_REVEAL).toBeLessThan(BALANCE.PHASE_MS.ROLE_REVEAL);
   });
 });

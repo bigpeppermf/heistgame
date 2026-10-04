@@ -22,11 +22,11 @@ export class MatchRegistry {
     return this.matches.size;
   }
 
-  create(nickname: string): { roomCode: string; playerId: string } {
+  create(nickname: string, demo = false): { roomCode: string; playerId: string } {
     let roomCode = randomCode();
     while (this.matches.has(roomCode)) roomCode = randomCode();
 
-    const engine = new MatchEngine(roomCode, this.deps);
+    const engine = new MatchEngine(roomCode, this.deps, demo);
     this.matches.set(roomCode, engine);
 
     const joined = engine.addPlayer(nickname);

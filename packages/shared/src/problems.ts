@@ -16,6 +16,10 @@ export const PROBLEMS: Problem[] = [
       python: 'def crack_vault(codes, target):\n    # codes: list[int], target: int\n    # return the two positions as a list, e.g. [0, 1]\n    pass\n',
       javascript: 'function crackVault(codes, target) {\n  // codes: number[], target: number\n  // return the two positions as an array, e.g. [0, 1]\n}\n',
     },
+    solution: {
+      python: 'def crack_vault(codes, target):\n    """Return the indices of the two codes that sum to the target."""\n    index_by_value = {}\n    for index, code in enumerate(codes):\n        complement = target - code\n        if complement in index_by_value:\n            return [index_by_value[complement], index]\n        index_by_value[code] = index\n    return []\n',
+      javascript: 'function crackVault(codes, target) {\n  // Return the indices of the two codes that sum to the target.\n  const indexByValue = new Map();\n  for (let index = 0; index < codes.length; index += 1) {\n    const complement = target - codes[index];\n    if (indexByValue.has(complement)) return [indexByValue.get(complement), index];\n    indexByValue.set(codes[index], index);\n  }\n  return [];\n}\n',
+    },
     comparison: 'unordered',
     sampleTests: [
       { input: [[2, 7, 11, 15], 9], expected: [0, 1] },
@@ -46,6 +50,10 @@ export const PROBLEMS: Problem[] = [
     starterCode: {
       python: 'def disarm(grid):\n    # grid: str of ()[]{}\n    # return True or False\n    pass\n',
       javascript: 'function disarm(grid) {\n  // grid: string of ()[]{}\n  // return true or false\n}\n',
+    },
+    solution: {
+      python: 'def disarm(grid):\n    """Return True when every bracket closes in the correct order."""\n    opening_for = {\')\': \'(\', \']\': \'[\', \'}\': \'{\'}\n    open_brackets = []\n    for symbol in grid:\n        if symbol in opening_for:\n            if not open_brackets or open_brackets.pop() != opening_for[symbol]:\n                return False\n        else:\n            open_brackets.append(symbol)\n    return not open_brackets\n',
+      javascript: 'function disarm(grid) {\n  // True when every bracket closes in the correct order.\n  const openingFor = { \')\': \'(\', \']\': \'[\', \'}\': \'{\' };\n  const openBrackets = [];\n  for (const symbol of grid) {\n    if (openingFor[symbol]) {\n      if (openBrackets.pop() !== openingFor[symbol]) return false;\n    } else {\n      openBrackets.push(symbol);\n    }\n  }\n  return openBrackets.length === 0;\n}\n',
     },
     comparison: 'exact',
     sampleTests: [
@@ -80,6 +88,10 @@ export const PROBLEMS: Problem[] = [
       python: 'def count_routes(n):\n    # n: int, number of checkpoints\n    # return the number of distinct routes\n    pass\n',
       javascript: 'function countRoutes(n) {\n  // n: number of checkpoints\n  // return the number of distinct routes\n}\n',
     },
+    solution: {
+      python: 'def count_routes(n):\n    """Count the distinct one- or two-step routes landing exactly on n."""\n    routes_to_previous, routes_to_current = 1, 1\n    for _ in range(n - 1):\n        routes_to_previous, routes_to_current = (\n            routes_to_current, routes_to_previous + routes_to_current\n        )\n    return routes_to_current\n',
+      javascript: 'function countRoutes(n) {\n  // Count the distinct one- or two-step routes landing exactly on n.\n  let routesToPrevious = 1;\n  let routesToCurrent = 1;\n  for (let step = 1; step < n; step += 1) {\n    const next = routesToPrevious + routesToCurrent;\n    routesToPrevious = routesToCurrent;\n    routesToCurrent = next;\n  }\n  return routesToCurrent;\n}\n',
+    },
     comparison: 'exact',
     sampleTests: [
       { input: [2], expected: 2 },
@@ -110,6 +122,10 @@ export const PROBLEMS: Problem[] = [
     starterCode: {
       python: 'def best_window(coverage):\n    # coverage: list[int] of hourly values\n    # return the largest later-minus-earlier increase, or 0\n    pass\n',
       javascript: 'function bestWindow(coverage) {\n  // coverage: number[] of hourly values\n  // return the largest later-minus-earlier increase, or 0\n}\n',
+    },
+    solution: {
+      python: 'def best_window(coverage):\n    """Return the largest later-minus-earlier increase, or 0 if none."""\n    best_increase = 0\n    lowest_so_far = None\n    for value in coverage:\n        if lowest_so_far is None or value < lowest_so_far:\n            lowest_so_far = value\n        else:\n            best_increase = max(best_increase, value - lowest_so_far)\n    return best_increase\n',
+      javascript: 'function bestWindow(coverage) {\n  // Largest later-minus-earlier increase, or 0 when there is none.\n  let bestIncrease = 0;\n  let lowestSoFar = Infinity;\n  for (const value of coverage) {\n    if (value < lowestSoFar) lowestSoFar = value;\n    else bestIncrease = Math.max(bestIncrease, value - lowestSoFar);\n  }\n  return bestIncrease;\n}\n',
     },
     comparison: 'exact',
     sampleTests: [
