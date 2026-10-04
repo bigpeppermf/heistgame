@@ -1,0 +1,12 @@
+node_modules
+**/node_modules
+**/dist
+**/.next
+.git
+.superpowers
+.remember
+apps/web/public
+docs
+*.log
+**/.env
+**/tsconfig.tsbuildinfo
