@@ -9,3 +9,5 @@ dist/
 # Next.js generated
 apps/web/next-env.d.ts
 .next/
+.vercel
+.env*
