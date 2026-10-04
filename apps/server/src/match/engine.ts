@@ -514,6 +514,7 @@ export class MatchEngine {
       roomCode: this.roomCode,
       phase: this.phase,
       deadlineAt: this.deadlineAt,
+      serverNow: now,
       round: this.round,
       problem: this.problem ? toPublicProblem(this.problem, viewer?.role, this.demo) : null,
       players: this.players.map((p) => this.viewOf(p, viewerId, now)),

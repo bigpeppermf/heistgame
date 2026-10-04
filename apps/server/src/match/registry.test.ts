@@ -120,3 +120,29 @@ describe('demo matches', () => {
     expect(FAST_MATCH_PHASE_MS.ROLE_REVEAL).toBeLessThan(BALANCE.PHASE_MS.ROLE_REVEAL);
   });
 });
+
+describe('snapshots carry the server clock', () => {
+  it('stamps serverNow so a client can correct its own clock', () => {
+    const { reg, advance, at } = registry();
+    const { roomCode, playerId } = reg.create('Danny');
+    const engine = reg.get(roomCode)!;
+
+    expect(engine.snapshotFor(playerId).serverNow).toBe(at());
+    advance(7_531);
+    expect(engine.snapshotFor(playerId).serverNow).toBe(at());
+  });
+
+  it('stamps it consistently with the deadline it sends', () => {
+    const { reg, at } = registry();
+    const { roomCode, playerId } = reg.create('Danny');
+    const engine = reg.get(roomCode)!;
+    const second = engine.addPlayer('Rusty');
+    if (!second.ok) throw new Error('setup failed');
+
+    const snap = engine.snapshotFor(playerId);
+    // The pair is what a client needs: both come from the same clock, so the
+    // remaining time is correct no matter what the client's own clock says.
+    expect(snap.serverNow).toBe(at());
+    expect(snap.deadlineAt! - snap.serverNow).toBe(FAST_MATCH_PHASE_MS.ROLE_REVEAL);
+  });
+});
