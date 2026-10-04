@@ -52,8 +52,11 @@ export const BALANCE = {
   MATCH_DESTROY_MS: 60_000,
 
   // ai judge
-  GEMINI_TIMEOUT_MS: 4_000,
-  GEMINI_MODEL: 'gemini-2.5-flash',
+  // A live gemini-3.8-flash style call measured 2.2-3.2s, so 4s left under a
+  // second of headroom and would silently fall back to the fixed rubric.
+  // Still 2s clear of the 8s JUDGING cap, which bounds max(exec, gemini).
+  GEMINI_TIMEOUT_MS: 6_000,
+  GEMINI_MODEL: 'gemini-3.8-flash',
 } as const;
 
 /** Collapses every phase so a full match plays in under a minute. */
