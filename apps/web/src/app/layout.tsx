@@ -4,6 +4,7 @@ import '../styles/game.css';
 
 export const metadata: Metadata = {
   title: 'git money',
+  icons: { icon: [{ url: '/favicon.png', type: 'image/png', sizes: '32x32' }] },
   description: 'Two coders. One vault. Only one gets away.',
 };
 

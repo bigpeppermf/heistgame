@@ -100,6 +100,34 @@ describe('socket handler boundaries', () => {
     expect(registry.get(code)!.players).toHaveLength(1);
   });
 
+  it('lets the same connection create another game after game over', async () => {
+    const { client, registry } = await setup();
+    const first = await ask(client, 'create_room', { nickname: 'First' });
+    const finished = registry.get(first.data!.roomCode!)!;
+    finished.phase = 'GAME_OVER';
+    const second = await ask(client, 'create_room', { nickname: 'Second' });
+    expect(second.ok).toBe(true);
+    expect(second.data!.roomCode).not.toBe(first.data!.roomCode);
+    expect(finished.players[0]!.connected).toBe(false);
+    expect(registry.get(second.data!.roomCode!)!.players[0]!.connected).toBe(true);
+    expect((await ask(client, 'rejoin', second.data)).ok).toBe(true);
+  });
+
+  it('lets the same connection join another game after game over', async () => {
+    const { client, registry } = await setup();
+    const first = await ask(client, 'create_room', { nickname: 'First' });
+    const finished = registry.get(first.data!.roomCode!)!;
+    finished.phase = 'GAME_OVER';
+    const nextRoom = registry.create('Host');
+    const joined = await ask(client, 'join_room', { roomCode: nextRoom.roomCode, nickname: 'Returning' });
+    expect(joined.ok).toBe(true);
+    expect(finished.players[0]!.connected).toBe(false);
+    const newMatch = registry.get(nextRoom.roomCode)!;
+    expect(newMatch.players).toHaveLength(2);
+    expect(newMatch.phase).toBe('ROLE_REVEAL');
+    expect((await ask(client, 'rejoin', { roomCode: nextRoom.roomCode, playerId: joined.data!.playerId })).ok).toBe(true);
+  });
+
   it('sends a terminal run result with the acknowledged runId when execution rejects', async () => {
     const runCode = vi.fn(async () => { throw new Error('secret filesystem path'); });
     const { client, registry } = await setup(runCode);

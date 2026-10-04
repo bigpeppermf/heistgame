@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type {
   MatchSnapshot, PlayerView, PowerupType, Role, RoundScore, TestResult,
 } from '@heist/shared';
+import { gadgetInfo } from '@/components/polished/visuals';
 import { ask, getSocket, loadSession } from './socket';
 
 export type RunOutput = {
@@ -70,15 +71,34 @@ export function useMatch(roomCode: string) {
       if (!connectedOnce) setConnectionError('Cannot connect to the game server. Retrying…');
     };
 
+    let previousPlayer: PlayerView | null = null;
+    const onSnapshot = (next: MatchSnapshot) => {
+      const player = next.players.find((p) => p.id === myId);
+      if (player && previousPlayer) {
+        // Compare counts so duplicate gadgets and automatic stash awards are covered.
+        const remaining = [...previousPlayer.inventory];
+        const received = player.inventory.filter((type) => {
+          const index = remaining.indexOf(type);
+          if (index < 0) return true;
+          remaining.splice(index, 1);
+          return false;
+        });
+        if (player.shielded && !previousPlayer.shielded) received.push('SHIELD');
+        if (received.length) setToast(received.map((type) =>
+          `${gadgetInfo[type].name} received. ${gadgetInfo[type].description}`).join(' '));
+      }
+      previousPlayer = player ?? null;
+      setSnapshot(next);
+    };
     const onRoundResult = ({ scores }: { scores: Record<string, RoundScore> }) => setRoundResult(scores);
     const onRunOutput = (p: RunOutput) => setRunOutput(p);
     const onProgress = ({ playerId: who, done, total }: { playerId: string; done: number; total: number }) =>
       setProgress((prev) => ({ ...prev, [who]: { done, total } }));
     const onOffer = (p: Offer) => setOffer(p);
     const onGameOver = (p: GameOver) => setGameOver(p);
-    const onBlocked = ({ type }: { type: PowerupType }) => setToast(`${type} BLOCKED BY SHIELD`);
+    const onBlocked = ({ type }: { type: PowerupType }) => setToast(`${gadgetInfo[type].name} blocked by Shield.`);
     const onApplied = ({ type, targetId }: { type: PowerupType; targetId: string }) => {
-      if (targetId === myId) setToast(`INCOMING: ${type}`);
+      if (targetId === myId) setToast(`Incoming: ${gadgetInfo[type].name}`);
     };
     const onError = ({ message }: { message: string }) => setToast(message);
     const onDark = () => setToast('OPPONENT WENT DARK');
@@ -86,7 +106,7 @@ export function useMatch(roomCode: string) {
 
     socket.on('connect', onConnect);
     socket.on('connect_error', onConnectError);
-    socket.on('snapshot', setSnapshot);
+    socket.on('snapshot', onSnapshot);
     socket.on('round_result', onRoundResult);
     socket.on('run_output', onRunOutput);
     socket.on('test_progress', onProgress);
@@ -115,7 +135,7 @@ export function useMatch(roomCode: string) {
       if (redirectTimer) clearTimeout(redirectTimer);
       socket.off('connect', onConnect);
       socket.off('connect_error', onConnectError);
-      socket.off('snapshot', setSnapshot);
+      socket.off('snapshot', onSnapshot);
       socket.off('round_result', onRoundResult);
       socket.off('run_output', onRunOutput);
       socket.off('test_progress', onProgress);
@@ -132,7 +152,7 @@ export function useMatch(roomCode: string) {
   // Clear a toast after a moment.
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(null), 2_500);
+    const t = setTimeout(() => setToast(null), 6_000);
     return () => clearTimeout(t);
   }, [toast]);
 

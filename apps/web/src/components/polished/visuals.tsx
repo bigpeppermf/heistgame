@@ -23,13 +23,13 @@ export const roleLabel = (role: Role) => ROLE_LABELS[role];
 export const roleColor = (role: Role) => role === 'COP' ? hc.cop : hc.robber;
 
 export const gadgetInfo: Record<PowerupType, { name: string; description: string }> = {
-  EMP: { name: 'EMP', description: 'Disrupt the rival rig' },
-  BLACKOUT: { name: 'Blackout', description: 'Kill their editor lights' },
-  JAMMED_COMMS: { name: 'Jammed Comms', description: 'Scramble their test feed' },
-  SMOKE_BOMB: { name: 'Smoke Bomb', description: 'Disappear into the haze' },
-  ROADBLOCK: { name: 'Roadblock', description: 'Slow the pursuit' },
-  GETAWAY_CAR: { name: 'Getaway Car', description: 'Make a clean break' },
-  SHIELD: { name: 'Shield', description: 'Auto-arms on pickup' },
+  EMP: { name: 'EMP', description: 'Disable your opponent’s Run button for 15 seconds. Use during coding.' },
+  BLACKOUT: { name: 'Blackout', description: 'Cover your opponent’s editor for 6 seconds. Use during coding.' },
+  JAMMED_COMMS: { name: 'Jammed Comms', description: 'Hide your opponent’s test results for 20 seconds. Use during coding.' },
+  SMOKE_BOMB: { name: 'Smoke Bomb', description: 'Hide your score and test progress from your opponent until this round ends. Use during coding.' },
+  ROADBLOCK: { name: 'Roadblock', description: 'Reduce your opponent’s next move by 1 tile (minimum 1). Use during the powerup phase.' },
+  GETAWAY_CAR: { name: 'Getaway Car', description: 'Add 1 tile to your next move. Use during the powerup phase.' },
+  SHIELD: { name: 'Shield', description: 'Automatically block the next hostile powerup used against you. Arms immediately on pickup.' },
 };
 
 export function Emblem({ role, size = 18 }: { role: Role; size?: number }) {

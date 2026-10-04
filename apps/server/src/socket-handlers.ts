@@ -48,6 +48,18 @@ export function registerSocketHandlers(
       playerId = id;
       sockets.set(id, socket.id);
     };
+    // A completed (or already swept) match must not lock this connection forever.
+    const releaseFinishedMatch = () => {
+      if (!roomCode || !playerId) return;
+      const match = registry.get(roomCode);
+      if (match && match.phase !== 'GAME_OVER') return;
+      if (sockets.get(playerId) === socket.id) {
+        sockets.delete(playerId);
+        match?.setConnected(playerId, false);
+      }
+      roomCode = null;
+      playerId = null;
+    };
     const alreadyBound = (ack: Ack, code: string, id?: string): boolean => {
       if (!roomCode || !playerId || (roomCode === code && playerId === id)) return false;
       ack({ ok: false, error: 'ALREADY_IN_MATCH' });
@@ -57,6 +69,7 @@ export function registerSocketHandlers(
     socket.on('create_room', (payload: unknown, ack: unknown) => {
       if (!requireAck(ack)) return;
       if (!record(payload) || typeof payload.nickname !== 'string') return ack({ ok: false, error: 'INVALID_PAYLOAD' });
+      releaseFinishedMatch();
       if (roomCode) return ack({ ok: false, error: 'ALREADY_IN_MATCH' });
       const created = registry.create(payload.nickname.slice(0, 20) || 'Anonymous');
       bind(created.roomCode, created.playerId);
@@ -68,6 +81,7 @@ export function registerSocketHandlers(
     socket.on('join_room', (payload: unknown, ack: unknown) => {
       if (!requireAck(ack)) return;
       if (!roomPayload(payload)) return ack({ ok: false, error: 'INVALID_PAYLOAD' });
+      releaseFinishedMatch();
       if (roomCode) return ack({ ok: false, error: 'ALREADY_IN_MATCH' });
       const match = registry.get(payload.roomCode);
       if (!match) return ack({ ok: false, error: 'NO_SUCH_ROOM' });

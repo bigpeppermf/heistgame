@@ -309,7 +309,7 @@ export default function MatchPage({ params }: { params: Promise<{ code: string }
         />
       )}
 
-      {gameOver && <GameOverOverlay winner={gameOver.winner} reason={gameOver.reason} />}
+      {gameOver && <GameOverOverlay winner={gameOver.winner} reason={gameOver.reason} viewerRole={me?.role} />}
     </main>
   );
 }

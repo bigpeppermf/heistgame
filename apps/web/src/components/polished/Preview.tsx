@@ -49,7 +49,7 @@ export default function Preview() {
       <div className="grid gap-6 lg:grid-cols-2"><Demo title="03 / Three gadgets + shield"><PowerupTray me={robber} phase="CODING" hostileUsed={true} onUse={() => undefined} /></Demo><Demo title="03 / Empty inventory"><PowerupTray me={cop} phase="CODING" hostileUsed={true} onUse={() => undefined} /></Demo></div>
       <Demo title="04 / Stacked active effects"><div className="p-6"><ActiveEffectBadges effects={robber.activeEffects} now={fixtureNow} /></div></Demo>
       <div className="grid gap-6 lg:grid-cols-2"><Demo title="05 / Stash offer" height="h-[420px]"><PowerupOffer options={['BLACKOUT', 'ROADBLOCK']} secondsLeft={7} onChoose={() => undefined} /></Demo><Demo title="06 / Editor blackout" height="h-[420px]"><BlackoutOverlay secondsLeft={9} /></Demo></div>
-      <div className="grid gap-6 lg:grid-cols-2"><Demo title="07 / Jammed test results" height="h-[280px]"><JammedPanel secondsLeft={6} /></Demo><Demo title="08 / Game over" height="h-[420px]"><GameOverOverlay winner="ROBBER" reason="ESCAPED" /></Demo></div>
+      <div className="grid gap-6 lg:grid-cols-2"><Demo title="07 / Jammed test results" height="h-[280px]"><JammedPanel secondsLeft={6} /></Demo><Demo title="08 / Game over" height="h-[420px]"><GameOverOverlay winner="ROBBER" reason="ESCAPED" viewerRole="ROBBER" /></Demo></div>
     </div>
   </main>;
 }
