@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { BALANCE } from '@heist/shared';
 import {
   advance, checkWin, finalTiles, rubricTotal, scoreSubmission, tilesForScore,
 } from './scoring.js';
@@ -40,8 +41,8 @@ describe('scoreSubmission', () => {
 
 describe('tilesForScore', () => {
   it.each([
-    [0, 1], [30, 1], [31, 2], [50, 2], [51, 3],
-    [70, 3], [71, 4], [90, 4], [91, 5], [100, 5],
+    [0, 1], [30, 1], [31, 1], [50, 1], [51, 2],
+    [70, 2], [71, 2], [90, 2], [91, 3], [100, 3],
   ])('score %i yields %i tiles', (score, tiles) => {
     expect(tilesForScore(score)).toBe(tiles);
   });
@@ -83,8 +84,15 @@ describe('checkWin', () => {
     expect(checkWin(10, 14, 3)).toEqual({ role: 'ROBBER', reason: 'ESCAPED' });
   });
 
-  it('gives the robber the win when three rounds elapse uncaught', () => {
-    expect(checkWin(5, 9, 3)).toEqual({ role: 'ROBBER', reason: 'EVADED' });
+  it('no longer ends the match merely because rounds have passed', () => {
+    // The old three-round limit is gone; only the board ends a match.
+    expect(checkWin(5, 9, 3)).toBeNull();
+    expect(checkWin(5, 9, 10)).toBeNull();
+  });
+
+  it('awards the robber the win at the hard cap, as a backstop', () => {
+    expect(checkWin(5, 9, BALANCE.ROUND_HARD_CAP))
+      .toEqual({ role: 'ROBBER', reason: 'EVADED' });
   });
 
   it('returns null mid-match', () => {

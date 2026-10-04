@@ -106,6 +106,29 @@ export function randomPowerup(rng: () => number = Math.random): PowerupType {
 }
 
 /**
+ * A player's luck, seeded by their alias: two different aliases draw different
+ * sequences, and the same alias draws the same one every match. Deterministic
+ * on purpose, so a demo can be rehearsed and replayed.
+ *
+ * xmur3 seeding into mulberry32 — small, fast, and good enough to pick between
+ * seven power-ups. Not for anything security-sensitive.
+ */
+export function seededRng(seed: string): () => number {
+  let h = 1779033703 ^ seed.length;
+  for (let i = 0; i < seed.length; i += 1) {
+    h = Math.imul(h ^ seed.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  let state = h >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
  * Phase legality, per spec section 9. Checked BEFORE applyEffect so an
  * illegal attempt never consumes the item.
  */

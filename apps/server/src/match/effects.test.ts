@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
-  applyEffect, awardPowerup, type EffectPlayer, hasActiveEffect, isUsableInPhase,
-  pruneEffects, resetRound, sumModifiers,
+  applyEffect, awardPowerup, hasActiveEffect, isUsableInPhase, pruneEffects, randomPowerup, resetRound, seededRng, sumModifiers, type EffectPlayer,
 } from './effects.js';
 
 const NOW = 1_000_000;
@@ -153,5 +152,41 @@ describe('isUsableInPhase', () => {
   it('never allows SHIELD to be used, in any phase', () => {
     expect(isUsableInPhase('SHIELD', 'CODING')).toBe(false);
     expect(isUsableInPhase('SHIELD', 'POWERUP')).toBe(false);
+  });
+});
+
+describe('seededRng — power-up luck per alias', () => {
+  it('is deterministic for the same alias', () => {
+    const a = seededRng('Danny');
+    const b = seededRng('Danny');
+    const draws = (rng: () => number) => Array.from({ length: 8 }, () => rng());
+    expect(draws(a)).toEqual(draws(b));
+  });
+
+  it('gives different aliases different sequences', () => {
+    const danny = Array.from({ length: 8 }, seededRng('Danny'));
+    const rusty = Array.from({ length: 8 }, seededRng('Rusty'));
+    expect(danny).not.toEqual(rusty);
+  });
+
+  it('advances, so one alias does not draw the same value forever', () => {
+    const rng = seededRng('Linus');
+    const draws = new Set(Array.from({ length: 20 }, () => rng()));
+    expect(draws.size).toBeGreaterThan(15);
+  });
+
+  it('stays inside [0, 1)', () => {
+    const rng = seededRng('Basher');
+    for (let i = 0; i < 200; i += 1) {
+      const v = rng();
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThan(1);
+    }
+  });
+
+  it('spreads across every awardable power-up', () => {
+    const rng = seededRng('Saul');
+    const seen = new Set(Array.from({ length: 300 }, () => randomPowerup(rng)));
+    expect(seen.size).toBe(7);
   });
 });

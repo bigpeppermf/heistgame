@@ -33,6 +33,8 @@ export function checkWin(
 ): { role: Role; reason: 'CAUGHT' | 'ESCAPED' | 'EVADED' } | null {
   if (copPos >= robberPos) return { role: 'COP', reason: 'CAUGHT' };
   if (robberPos >= BALANCE.ESCAPE_TILE) return { role: 'ROBBER', reason: 'ESCAPED' };
-  if (roundsPlayed >= BALANCE.TOTAL_ROUNDS) return { role: 'ROBBER', reason: 'EVADED' };
+  // Backstop only. The Robber always gains at least MIN_TILES, so an ordinary
+  // match reaches ESCAPE_TILE long before this.
+  if (roundsPlayed >= BALANCE.ROUND_HARD_CAP) return { role: 'ROBBER', reason: 'EVADED' };
   return null;
 }
