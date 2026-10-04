@@ -71,7 +71,8 @@ export function registerSocketHandlers(
       if (!record(payload) || typeof payload.nickname !== 'string') return ack({ ok: false, error: 'INVALID_PAYLOAD' });
       releaseFinishedMatch();
       if (roomCode) return ack({ ok: false, error: 'ALREADY_IN_MATCH' });
-      const created = registry.create(payload.nickname.slice(0, 20) || 'Anonymous');
+      // Anything other than an explicit `true` is a normal match.
+      const created = registry.create(payload.nickname.slice(0, 20) || 'Anonymous', payload.demo === true);
       bind(created.roomCode, created.playerId);
       ack({ ok: true, data: created });
       const match = registry.get(created.roomCode);

@@ -243,6 +243,16 @@ export default function MatchPage({ params }: { params: Promise<{ code: string }
                 >
                   {emp ? `EMP ${secondsUntil(emp.expiresAt, now)}s` : 'RUN'}
                 </button>
+                {snapshot.demo && problem?.solution && (
+                  <button
+                    className="game-primary px-4 py-2 text-sm disabled:opacity-40"
+                    title="Demo match: load the reference answer"
+                    disabled={me?.submitted}
+                    onClick={() => onCodeChange(problem.solution![language])}
+                  >
+                    SOLUTION
+                  </button>
+                )}
                 <button
                   className="game-primary px-4 py-2 text-sm text-black disabled:opacity-40"
                   style={{ background: 'var(--hc-gold)' }}

@@ -54,3 +54,15 @@
   .landing [data-node-id] { animation: none; }
   .landing-light { opacity: .2; }
 }
+
+/* Demo-mode toggle on the create form. */
+.landing-demo {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin: .25rem 0 .5rem;
+  font-size: .85rem;
+  opacity: .85;
+  cursor: pointer;
+}
+.landing-demo input { accent-color: var(--hc-gold, #d4af37); cursor: pointer; }
