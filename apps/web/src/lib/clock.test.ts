@@ -27,3 +27,34 @@ describe('formatClock', () => {
     expect(formatClock(0)).toBe('0:00');
   });
 });
+
+describe('clock-skew correction', () => {
+  // Every deadline the server sends is an absolute server timestamp, so a
+  // client with a wrong clock counts down to the wrong moment. This is the
+  // bug as observed: a laptop ~2 days behind showed ~2900 minutes remaining
+  // on a 10-minute CODING phase.
+  const serverNow = 1_700_000_000_000;
+  const deadlineAt = serverNow + 600_000; // a 10-minute phase
+  const localNow = serverNow - 48 * 3_600_000; // laptop is 48h behind
+
+  it('reproduces the bad countdown when the local clock is trusted', () => {
+    expect(Math.round(remainingMs(deadlineAt, localNow) / 60_000)).toBe(2890);
+  });
+
+  it('counts down correctly once the snapshot offset is applied', () => {
+    const offset = serverNow - localNow;
+    expect(formatClock(remainingMs(deadlineAt, localNow + offset))).toBe('10:00');
+  });
+
+  it('is a no-op for a client whose clock already agrees', () => {
+    const offset = serverNow - serverNow;
+    expect(offset).toBe(0);
+    expect(formatClock(remainingMs(deadlineAt, serverNow + offset))).toBe('10:00');
+  });
+
+  it('corrects a clock that is ahead as well as behind', () => {
+    const ahead = serverNow + 90_000; // 90s fast: phase would end early
+    expect(formatClock(remainingMs(deadlineAt, ahead))).toBe('8:30');
+    expect(formatClock(remainingMs(deadlineAt, ahead + (serverNow - ahead)))).toBe('10:00');
+  });
+});

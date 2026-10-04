@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type {
   MatchSnapshot, PlayerView, PowerupType, Role, RoundScore, TestResult,
@@ -26,6 +26,13 @@ export type GameOver = { winner: Role; reason: 'CAUGHT' | 'ESCAPED' | 'EVADED' }
 export function useMatch(roomCode: string) {
   const router = useRouter();
   const [snapshot, setSnapshot] = useState<MatchSnapshot | null>(null);
+  /**
+   * serverClock - Date.now(), learned from each snapshot. A laptop whose clock
+   * is days out still counts phases down correctly, because every deadline is
+   * compared against corrected time rather than the machine's own.
+   */
+  const clockOffset = useRef(0);
+  const serverNow = () => Date.now() + clockOffset.current;
   const [now, setNow] = useState(() => Date.now());
   const [roundResult, setRoundResult] = useState<Record<string, RoundScore> | null>(null);
   const [runOutput, setRunOutput] = useState<RunOutput | null>(null);
@@ -88,6 +95,12 @@ export function useMatch(roomCode: string) {
           `${gadgetInfo[type].name} received. ${gadgetInfo[type].description}`).join(' '));
       }
       previousPlayer = player ?? null;
+      // Older servers omit serverNow; the offset then stays 0 and behaviour is
+      // unchanged. Includes network latency, which is milliseconds, not days.
+      if (typeof next.serverNow === 'number') {
+        clockOffset.current = next.serverNow - Date.now();
+        setNow(serverNow());
+      }
       setSnapshot(next);
     };
     const onRoundResult = ({ scores }: { scores: Record<string, RoundScore> }) => setRoundResult(scores);
@@ -127,7 +140,7 @@ export function useMatch(roomCode: string) {
       }, 10_000);
     }
 
-    const clock = setInterval(() => setNow(Date.now()), 200);
+    const clock = setInterval(() => setNow(serverNow()), 200);
     return () => {
       active = false;
       clearInterval(clock);

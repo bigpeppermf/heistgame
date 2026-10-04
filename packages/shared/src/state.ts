@@ -109,6 +109,13 @@ export type MatchSnapshot = {
   roomCode: string;
   phase: Phase;
   deadlineAt: number | null;
+  /**
+   * The server's clock when this snapshot was built. Every deadline in the
+   * game is an absolute server timestamp, so a client whose own clock is wrong
+   * would count down to the wrong moment. Clients subtract their own Date.now()
+   * from this to get an offset and correct every countdown with it.
+   */
+  serverNow: number;
   round: number;
   problem: PublicProblem | null;
   players: PlayerView[];
