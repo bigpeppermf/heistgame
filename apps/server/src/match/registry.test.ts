@@ -7,7 +7,7 @@ function registry() {
   const reg = new MatchRegistry({
     now: () => clock,
     emit: () => {},
-    execute: async () => ({ results: [], stdout: '', stderr: '', timedOut: false, passed: 0 }),
+    execute: async () => ({ results: [], stdout: '', stderr: '', timedOut: false, outputCapped: false, passed: 0 }),
     judgeStyle: async () => ({
       naming: 0, readability: 0, comments: 0, organization: 0, simplicity: 0, note: '',
     }),

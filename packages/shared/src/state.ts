@@ -69,6 +69,12 @@ export type RoundScore = {
   passed: number;
   totalTests: number;
   note: string;
+  /**
+   * True when Smoke Bomb hid this player's result from the viewer. The
+   * revealing fields (correctness, total, passed, note) are zeroed when set;
+   * tiles and position stay truthful because the board shows them anyway.
+   */
+  concealed?: boolean;
 };
 
 export type PlayerView = {
@@ -83,6 +89,8 @@ export type PlayerView = {
   connected: boolean;
   /** null when the opponent is concealed by Smoke Bomb */
   progress: number | null;
+  /** Hostile power-ups spent this round; the cap is BALANCE.HOSTILE_PER_ROUND. */
+  hostileUsed: number;
 };
 
 export type MatchSnapshot = {
@@ -92,5 +100,13 @@ export type MatchSnapshot = {
   round: number;
   problem: PublicProblem | null;
   players: PlayerView[];
+  /** The viewer's own unclaimed power-up offer; null when there is none. */
+  offer: PowerupType[] | null;
+  /**
+   * The most recent round's scores as this viewer is permitted to see them,
+   * or null before the first round resolves. Mirrors the `round_result`
+   * event so a reload mid-SCORING recovers the panel.
+   */
+  scores: Record<string, RoundScore> | null;
   winner?: { role: Role; reason: 'CAUGHT' | 'ESCAPED' | 'EVADED' };
 };
