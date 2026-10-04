@@ -42,8 +42,15 @@ COPY apps/server apps/server
 RUN chown -R node:node /app
 USER node
 
+# npm is NOT used at runtime. As a non-root user Docker leaves HOME pointing at
+# root's directory, so npm tries to create its cache in /root/.npm and dies with
+# EACCES before the server ever starts. Setting HOME fixes that, and invoking
+# node directly keeps npm off the startup path entirely.
+ENV HOME=/home/node
 ENV NODE_ENV=production
-# Railway injects its own PORT and the server reads it; this is documentation.
+
+WORKDIR /app/apps/server
 EXPOSE 4000
 
-CMD ["npm", "run", "-w", "@heist/server", "start"]
+# --env-file-if-exists tolerates the absent .env; config comes from the platform.
+CMD ["node", "--env-file-if-exists=.env", "--import", "tsx", "src/index.ts"]
