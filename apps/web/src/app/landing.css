@@ -6,7 +6,7 @@
   min-height: 100svh;
   overflow: hidden;
   background: linear-gradient(180deg, #10092b 0%, #2d2d27 96.635%, #2a4155 100%);
-  font-family: 'Ubuntu Mono', monospace;
+  font-family: var(--font-mono);
 }
 .landing-scenery { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .landing-canvas { position: absolute; width: 1920px; height: 1080px; left: 50%; top: 0; transform-origin: top center; }
