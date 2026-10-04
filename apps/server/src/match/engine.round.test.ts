@@ -530,20 +530,35 @@ describe('a round always resolves', () => {
     }
   }
 
-  it('plays all three rounds through to GAME_OVER with the robber evading', async () => {
+  it('keeps playing past the old three-round limit', async () => {
     const h = harness({});
     const { aId, bId } = await toCoding(h);
 
-    for (let round = 1; round <= BALANCE.TOTAL_ROUNDS; round += 1) {
+    for (let round = 1; round <= 4; round += 1) {
       expect(h.engine.round).toBe(round);
       await finishRound(h, aId, bId, String(round));
     }
+    // There is no round limit any more: round 4 used to be impossible.
+    expect(h.engine.phase).not.toBe('GAME_OVER');
+    expect(h.engine.round).toBe(5);
+  });
+
+  it('ends when the robber reaches the escape tile', async () => {
+    const h = harness({});
+    const { aId, bId } = await toCoding(h);
+
+    // Nobody solves anything, so both sides crawl at MIN_TILES per round and
+    // the robber's head start carries them to the escape tile untouched.
+    for (let round = 1; round <= BALANCE.ROUND_HARD_CAP; round += 1) {
+      await finishRound(h, aId, bId, String(round));
+      if (h.engine.phase === 'GAME_OVER') break;
+    }
 
     expect(h.engine.phase).toBe('GAME_OVER');
-    // Nobody solved anything, so neither side closed the 3-tile gap: the
-    // robber survives the full heist, which the spec awards to the robber.
-    expect(h.engine.winner).toEqual({ role: 'ROBBER', reason: 'EVADED' });
+    expect(h.engine.winner).toEqual({ role: 'ROBBER', reason: 'ESCAPED' });
     expect(h.emitted.filter((e) => e.ev === 'game_over')).toHaveLength(2);
+    const robber = h.engine.players.find((p) => p.role === 'ROBBER')!;
+    expect(robber.position).toBeGreaterThanOrEqual(BALANCE.ESCAPE_TILE);
   });
 
   it('keeps a disconnected player in the match and tells the opponent', async () => {

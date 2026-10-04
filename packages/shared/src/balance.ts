@@ -17,7 +17,13 @@ export const BALANCE = {
   COP_START: 0,
   ROBBER_START: 3,
   STASH_TILES: [5, 9, 12] as readonly number[],
-  TOTAL_ROUNDS: 3,
+  /**
+    * There is no fixed match length: a match ends when the Cop catches the
+    * Robber or the Robber reaches ESCAPE_TILE. This is only a backstop so a
+    * pathological game cannot run forever. The Robber gains at least MIN_TILES
+    * per round, so a real match ends well inside it.
+    */
+  ROUND_HARD_CAP: 30,
 
   // scoring
   CORRECTNESS_WEIGHT: 80,
@@ -25,12 +31,14 @@ export const BALANCE = {
   STYLE_RUBRIC_MAX: 20,
   SPEED_BONUS_TILES: 1,
   MIN_TILES: 1,
+  // Deliberately shallow: with no round limit, the board race decides the
+  // match, so one strong round should not carry it.
   MOVEMENT_BRACKETS: [
     { max: 30, tiles: 1 },
-    { max: 50, tiles: 2 },
-    { max: 70, tiles: 3 },
-    { max: 90, tiles: 4 },
-    { max: 100, tiles: 5 },
+    { max: 50, tiles: 1 },
+    { max: 70, tiles: 2 },
+    { max: 90, tiles: 2 },
+    { max: 100, tiles: 3 },
   ] as readonly { max: number; tiles: number }[],
 
   // power-ups

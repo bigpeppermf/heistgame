@@ -8,7 +8,7 @@ import type { execute } from '../exec/runner.js';
 import type { judgeStyle } from '../judge/gemini.js';
 import {
   applyEffect, awardPowerup, EFFECTS, hasActiveEffect, isUsableInPhase,
-  pruneEffects, randomPowerup, resetRound, sumModifiers, type EffectPlayer,
+  pruneEffects, randomPowerup, resetRound, seededRng, sumModifiers, type EffectPlayer,
 } from './effects.js';
 import {
   advance, checkWin, finalTiles, rubricTotal, scoreSubmission, tilesForScore,
@@ -40,6 +40,8 @@ export type ServerPlayer = EffectPlayer & {
   lastScore: RoundScore | null;
   offer: PowerupType[] | null;
   lastRunAt: number;
+  /** This player's power-up luck, seeded by their alias. */
+  draw: () => number;
 };
 
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string };
@@ -91,6 +93,7 @@ export class MatchEngine {
       lastScore: null,
       offer: null,
       lastRunAt: 0,
+      draw: seededRng(nickname),
       inventory: [],
       shielded: false,
       activeEffects: [],
@@ -335,12 +338,12 @@ export class MatchEngine {
 
       // Perfect correctness earns one at random.
       if (score.totalTests > 0 && score.passed === score.totalTests) {
-        awardPowerup(player, randomPowerup());
+        awardPowerup(player, randomPowerup(player.draw));
       }
 
       // The sole highest scorer picks one of two.
       if (soleLeader && score.total === best) {
-        player.offer = [randomPowerup(), randomPowerup()];
+        player.offer = [randomPowerup(player.draw), randomPowerup(player.draw)];
         this.deps.emit(player.id, 'powerup_offer', { options: player.offer, deadlineAt });
       }
     }
@@ -364,7 +367,7 @@ export class MatchEngine {
     // An unclaimed offer resolves at random so the phase never stalls.
     for (const player of this.players) {
       if (player.offer) {
-        const pick = player.offer[Math.floor(Math.random() * player.offer.length)]!;
+        const pick = player.offer[Math.floor(player.draw() * player.offer.length)]!;
         awardPowerup(player, pick);
         player.offer = null;
       }
@@ -397,7 +400,7 @@ export class MatchEngine {
     // so a player who lands on a stash tile on a deciding round is still credited.
     for (const player of this.players) {
       if (BALANCE.STASH_TILES.includes(player.position)) {
-        awardPowerup(player, randomPowerup());
+        awardPowerup(player, randomPowerup(player.draw));
       }
     }
 

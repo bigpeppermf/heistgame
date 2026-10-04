@@ -85,14 +85,21 @@ const REFERENCE: Record<string, Record<Language, string>> = {
 };
 
 describe('problem set shape', () => {
-  it('has one problem per round plus a spare', () => {
-    expect(PROBLEMS).toHaveLength(BALANCE.TOTAL_ROUNDS + 1);
+  it('has at least one problem to hand out', () => {
+    expect(PROBLEMS.length).toBeGreaterThan(0);
   });
 
-  it('gives every round a problem', () => {
-    for (let r = 1; r <= BALANCE.TOTAL_ROUNDS; r += 1) {
+  it('gives every round a problem, however long the match runs', () => {
+    // Rounds are unbounded now, so this must hold past the end of the list.
+    for (let r = 1; r <= BALANCE.ROUND_HARD_CAP; r += 1) {
       expect(problemForRound(r).id).toBeTruthy();
     }
+  });
+
+  it('cycles the list rather than running out', () => {
+    const n = PROBLEMS.length;
+    expect(problemForRound(n + 1).id).toBe(problemForRound(1).id);
+    expect(problemForRound(n + 2).id).toBe(problemForRound(2).id);
   });
 
   it('has unique ids', () => {

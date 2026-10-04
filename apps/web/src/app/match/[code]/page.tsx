@@ -171,7 +171,7 @@ export default function MatchPage({ params }: { params: Promise<{ code: string }
         </div>
         <div className="text-center">
           <p className="text-xs" style={{ color: 'var(--hc-dim)' }}>
-            ROUND {round}/{BALANCE.TOTAL_ROUNDS} · {phaseLabels[phase ?? ''] ?? phase}
+            ROUND {round} · {phaseLabels[phase ?? ''] ?? phase}
           </p>
           <p className="game-clock">{clock}</p>
         </div>
@@ -289,7 +289,7 @@ export default function MatchPage({ params }: { params: Promise<{ code: string }
           </div>
         ) : (
           <div className="game-board-stage min-w-0 flex-1 overflow-auto p-6">
-            <div className="game-stage-heading"><p className="game-eyebrow">Round {round} / {BALANCE.TOTAL_ROUNDS}</p><h1>{phaseLabels[phase ?? ''] ?? 'The chase'}</h1></div>
+            <div className="game-stage-heading"><p className="game-eyebrow">Round {round}</p><h1>{phaseLabels[phase ?? ''] ?? 'The chase'}</h1></div>
             {phase === 'ROLE_REVEAL' && me && (
               <p className="mb-6 text-center text-xl">
                 Your side:{' '}

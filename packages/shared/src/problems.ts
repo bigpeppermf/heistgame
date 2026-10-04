@@ -145,9 +145,12 @@ export const PROBLEMS: Problem[] = [
   },
 ];
 
-/** Rounds are 1-indexed. The fourth problem is the spare. */
+/**
+ * Rounds are 1-indexed and unbounded, so the list cycles: round 5 reuses the
+ * first problem. Repeating beats running out mid-match.
+ */
 export function problemForRound(round: number): Problem {
-  const p = PROBLEMS[round - 1];
+  const p = PROBLEMS[(round - 1) % PROBLEMS.length];
   if (!p) throw new Error(`no problem for round ${round}`);
   return p;
 }
