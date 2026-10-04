@@ -13,7 +13,7 @@ function ScoreCard({ player, score }: { player: PlayerView; score: RoundScore | 
       </header>
       <div className="round-score-movement">
         <strong style={{ color: accent }}>{score?.tiles ?? '—'}</strong>
-        <div><span>{score?.tiles === 1 ? 'space earned' : 'spaces earned'}</span><p>This round’s move</p></div>
+        <div><span>{score?.tiles === 1 ? 'space earned' : 'spaces earned'}</span></div>
       </div>
       <dl className="round-score-metrics">
         <Metric label="Tests passed" value={score ? `${score.passed} / ${score.totalTests}` : '—'} />
@@ -37,8 +37,8 @@ export function ScorePanel({ players, scores, round }: { players: PlayerView[]; 
     <section role="dialog" aria-modal="true" aria-label={`Round ${round} results`} className="round-results absolute inset-0 z-40 overflow-y-auto">
       <div className="round-results-sheet">
         <header className="round-results-heading">
-          <div><p>Round {String(round).padStart(2, '0')} / score sheet</p><h2>Here’s how you did.</h2></div>
-          <span>Next up: make your move →</span>
+          <div><p>Round {String(round).padStart(2, '0')} / score sheet</p><h2>Round results</h2></div>
+          <span>Next: movement</span>
         </header>
         <div className="round-results-cards">{players.map(player => <ScoreCard key={player.id} player={player} score={scores[player.id]} />)}</div>
       </div>

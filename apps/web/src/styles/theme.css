@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@400;500;700&family=Bebas+Neue&display=swap');
 
 @theme {
   --color-hc-bg: var(--hc-bg);
@@ -11,10 +10,9 @@
   --color-hc-cop: var(--hc-cop);
   --color-hc-robber: var(--hc-robber);
 
-  --font-display: 'Bebas Neue', sans-serif;
-  /* The global monospace face. The code editor does NOT use this: Monaco is
-     pinned to its own family in CodeEditor.tsx and stays as it is. */
-  --font-mono: 'Azeret Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-display: 'Gruppo', sans-serif;
+  --font-mono: 'Gruppo', sans-serif;
+  --font-code: 'Ubuntu Mono', ui-monospace, Menlo, Consolas, monospace;
 }
 
 :root {
@@ -36,9 +34,6 @@
   --hc-radius-md: 8px;
   --hc-radius-lg: 12px;
   
-  --hc-shadow-glow-gold: 0 0 15px rgba(251, 191, 36, 0.3);
-  --hc-shadow-glow-cop: 0 0 15px rgba(74, 158, 232, 0.3);
-  --hc-shadow-glow-robber: 0 0 15px rgba(239, 68, 68, 0.3);
 }
 
 body {
@@ -48,6 +43,10 @@ body {
   margin: 0;
   padding: 0;
   -webkit-font-smoothing: antialiased;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
 }
 
 /* Utilities */
@@ -68,7 +67,7 @@ body {
   font-size: 1.25rem;
   letter-spacing: 0.05em;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
   border: 1px solid var(--hc-line);
   background: var(--hc-bg);
   color: var(--hc-text);
@@ -89,7 +88,6 @@ body {
 .hc-btn-primary:hover {
   background-color: #f59e0b;
   border-color: #f59e0b;
-  box-shadow: var(--hc-shadow-glow-gold);
 }
 
 .hc-chip {

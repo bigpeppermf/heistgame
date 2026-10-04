@@ -41,7 +41,7 @@ export function Board({ players }: { players: PlayerView[] }) {
   const gap = cop && robber ? Math.max(0, robber.position - cop.position) : null;
   return <section aria-label="Heist board" className="pursuit-board">
     <header className="pursuit-header">
-      <div><p className="game-eyebrow">git money / pursuit board</p><h2>The great getaway</h2><p className="pursuit-subtitle">One winding route. Stay ahead. Make it out.</p></div>
+      <div><p className="game-eyebrow">Pursuit board</p><h2>The getaway</h2></div>
       <div className="pursuit-distance"><span>Distance to capture</span><strong>{gap === null ? '—' : String(gap).padStart(2, '0')} <small>{gap === 1 ? 'space' : 'spaces'}</small></strong></div>
     </header>
     <div className="pursuit-scroll" tabIndex={0} aria-label="Pursuit map; scroll horizontally on small screens">

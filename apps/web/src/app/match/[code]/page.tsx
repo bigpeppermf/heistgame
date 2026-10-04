@@ -133,8 +133,7 @@ export default function MatchPage({ params }: { params: Promise<{ code: string }
       <main className="game-theme game-waiting">
         <header className="game-waiting-header"><GameBrand /><Link href="/" className="game-back">Back to home ↗</Link></header>
         <section className="game-lobby-card">
-          <p className="game-eyebrow">{snapshot ? 'The crew starts here' : 'Establishing connection'}</p>
-          <h1>{snapshot ? 'One job. Two players.' : 'Calling the crew…'}</h1>
+          <h1>{snapshot ? 'Game lobby' : 'Connecting…'}</h1>
           {snapshot ? <>
             <p className="game-muted">Send this code to your partner.</p>
             <div className="game-room-code" aria-label="Room code">{snapshot.roomCode}</div>
@@ -143,11 +142,10 @@ export default function MatchPage({ params }: { params: Promise<{ code: string }
               catch { notify('Select the room code to copy it.'); }
             }}>{toast === 'Room code copied' ? 'Copied ✓' : 'Copy room code'}</button>
             <p className="game-waiting-status"><span />Waiting for your partner…</p>
-            <p className="game-muted">{me?.nickname ?? 'Your crew'} · ready for the job</p>
+            <p className="game-muted">{me?.nickname ?? 'You'} · ready</p>
             {toast && toast !== 'Room code copied' && <p role="status">{toast}</p>}
           </> : <p className="game-muted" role="status">{connectionError ?? 'Connecting to the game server…'}</p>}
         </section>
-        <p className="game-waiting-footer">Two coders. One vault. Only one gets away.</p>
       </main>
     );
   }
@@ -212,7 +210,7 @@ export default function MatchPage({ params }: { params: Promise<{ code: string }
               </div>
             </>
           ) : (
-            <p style={{ color: 'var(--hc-dim)' }}>The job is being cased…</p>
+            <p style={{ color: 'var(--hc-dim)' }}>Loading problem…</p>
           )}
         </aside>
 

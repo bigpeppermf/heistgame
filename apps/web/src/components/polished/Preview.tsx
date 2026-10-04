@@ -37,13 +37,13 @@ const scores: Record<string, RoundScore> = {
 };
 
 function Demo({ title, children, height }: { title: string; children: ReactNode; height?: string }) {
-  return <section className="min-w-0"><h2 className="mb-3 text-xs font-black uppercase tracking-[.25em]" style={{ color: hc.gold }}>{title}</h2><div className={`relative overflow-hidden rounded-none border ${height ?? ''}`} style={{ borderColor: hc.line, background: hc.panel }}>{children}</div></section>;
+  return <section className="min-w-0"><h2 className="mb-3 text-xs font-black uppercase tracking-normal" style={{ color: hc.gold }}>{title}</h2><div className={`relative overflow-hidden rounded-none border ${height ?? ''}`} style={{ borderColor: hc.line, background: hc.panel }}>{children}</div></section>;
 }
 
 export default function Preview() {
   return <main className="game-theme game-preview min-h-screen px-4 py-8 sm:px-8" style={{ color: hc.text, background: hc.bg }}>
     <div className="mx-auto max-w-6xl space-y-9">
-      <header className="border-b pb-6" style={{ borderColor: hc.line }}><p className="text-xs font-black uppercase tracking-[.35em]" style={{ color: hc.gold }}>git money / component preview</p><h1 className="font-display mt-2 text-5xl font-black uppercase tracking-[.03em] sm:text-7xl">Visual review</h1><p className="mt-2 text-sm" style={{ color: hc.dim }}>Fixture: Heist Crew on tile 13, disconnected Cops, stacked effects, armed shield, and both empty and full loadouts.</p></header>
+      <header className="border-b pb-6" style={{ borderColor: hc.line }}><p className="text-xs font-black uppercase tracking-normal" style={{ color: hc.gold }}>git money / component preview</p><h1 className="font-display mt-2 text-5xl font-black uppercase tracking-normal sm:text-7xl">Visual review</h1><p className="mt-2 text-sm" style={{ color: hc.dim }}>Fixture: Heist Crew on tile 13, disconnected Cops, stacked effects, armed shield, and both empty and full loadouts.</p></header>
       <Demo title="01 / Board"><Board players={[cop, robber]} /></Demo>
       <Demo title="02 / Round score" height="h-[780px] sm:h-[620px]"><ScorePanel players={[cop, robber]} scores={scores} round={2} /></Demo>
       <div className="grid gap-6 lg:grid-cols-2"><Demo title="03 / Three gadgets + shield"><PowerupTray me={robber} phase="CODING" hostileUsed={true} onUse={() => undefined} /></Demo><Demo title="03 / Empty inventory"><PowerupTray me={cop} phase="CODING" hostileUsed={true} onUse={() => undefined} /></Demo></div>

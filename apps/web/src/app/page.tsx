@@ -89,7 +89,7 @@ export default function Landing() {
           {mode === 'create' && (
             <label className="landing-demo">
               <input type="checkbox" checked={demo} disabled={busy} onChange={(event) => setDemo(event.target.checked)} />
-              Demo mode — short rounds, solution on tap
+              Demo mode (short rounds, solutions available)
             </label>
           )}
           {error && <p role="alert" className="landing-form-error">{error === 'TIMEOUT' ? 'Cannot reach the game server. Please try again.' : error}</p>}
